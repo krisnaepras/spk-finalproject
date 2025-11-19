@@ -1,0 +1,116 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../node_modules/.prisma/client/default"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum CriteriaType {
+  BENEFIT
+  COST
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  alternatives   Alternative[]
+  criteria       Criteria[]
+  ahpComparisons AhpComparison[]
+  topsisResults  TopsisResult[]
+}
+
+model Alternative {
+  id          String   @id @default(cuid())
+  projectId   String
+  code        String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project      Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scores       AlternativeScore[]
+  topsisResult TopsisResult?
+
+  @@unique([projectId, code])
+}
+
+model Criteria {
+  id          String       @id @default(cuid())
+  projectId   String
+  code        String
+  name        String
+  description String?
+  type        CriteriaType
+  weight      Decimal?     @db.Decimal(18, 8)
+  isActive    Boolean      @default(true)
+  position    Int? // used to keep ordering in the UI
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  project    Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scores     AlternativeScore[]
+  compareAsI AhpComparison[]    @relation("CriteriaI")
+  compareAsJ AhpComparison[]    @relation("CriteriaJ")
+
+  @@unique([projectId, code])
+}
+
+model AlternativeScore {
+  id            String   @id @default(cuid())
+  alternativeId String
+  criteriaId    String
+  value         Decimal  @db.Decimal(18, 6)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  alternative Alternative @relation(fields: [alternativeId], references: [id], onDelete: Cascade)
+  criteria    Criteria    @relation(fields: [criteriaId], references: [id], onDelete: Cascade)
+
+  @@unique([alternativeId, criteriaId])
+}
+
+model AhpComparison {
+  id          String   @id @default(cuid())
+  projectId   String
+  criteriaIId String
+  criteriaJId String
+  value       Decimal  @db.Decimal(10, 4)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  criteriaI Criteria @relation("CriteriaI", fields: [criteriaIId], references: [id], onDelete: Cascade)
+  criteriaJ Criteria @relation("CriteriaJ", fields: [criteriaJId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, criteriaIId, criteriaJId])
+}
+
+model TopsisResult {
+  id            String   @id @default(cuid())
+  projectId     String
+  alternativeId String   @unique
+  scoreV        Decimal  @db.Decimal(18, 6)
+  dPlus         Decimal? @db.Decimal(18, 6)
+  dMinus        Decimal? @db.Decimal(18, 6)
+  rank          Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  alternative Alternative @relation(fields: [alternativeId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, rank])
+}

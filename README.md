@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Sistem Pendukung Keputusan (SPK) – Ringkasan Proyek
 
-## Getting Started
+Aplikasi ini adalah fondasi untuk website SPK generik dengan metode AHP + TOPSIS. Fokus utama:
 
-First, run the development server:
+- Import data alternatif dari berbagai sumber (Excel/CSV, JSON, SQL).
+- Pemilihan kriteria fleksibel (maks. 5) dengan tipe Benefit/Cost.
+- Modul AHP untuk bobot kriteria dan TOPSIS untuk pemeringkatan alternatif.
+
+## Menjalankan Aplikasi
 
 ```bash
+# Install dependencies
+npm install
+
+# Jalankan server pengembangan
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Server pengembangan tersedia di [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Prisma & Database
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1.  Sesuaikan `DATABASE_URL` di `.env` atau `.env.local`. Contoh standar:
+    ```
+    postgresql://postgres:postgres@localhost:5432/spk_mrl?schema=public
+    ```
+    Gunakan kredensial sesuai lingkungan Anda (PostgreSQL disarankan).
+2.  Setelah memperbarui skema Prisma, jalankan:
+    ```bash
+    npm run prisma:generate   # generate client
+    npm run prisma:migrate    # apply migrations (membutuhkan DB aktif)
+    npm run prisma:studio     # UI untuk melihat/edit data
+    npm run prisma:format     # format schema.prisma
+    ```
+3.  Untuk pengembangan sehari-hari cukup jalankan `npm run dev`; Prisma Client otomatis menggunakan konfigurasi dari `lib/prisma.ts`.
 
-## Learn More
+## Ringkasan Skema Prisma
 
-To learn more about Next.js, take a look at the following resources:
+- `Project` – container opsional untuk memisahkan studi kasus SPK.
+- `Alternative` – daftar alternatif (code, nama, deskripsi) per proyek.
+- `Criteria` – hingga 5 kriteria aktif, tipe Benefit/Cost, bobot AHP, dan posisi tampilan.
+- `AlternativeScore` – nilai matriks keputusan (X_ij) per alternatif x kriteria.
+- `AhpComparison` – matriks perbandingan berpasangan untuk perhitungan bobot.
+- `TopsisResult` – menyimpan V_i, D⁺, D⁻, dan peringkat terakhir.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Skema lengkap berada di `prisma/schema.prisma`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Struktur Projek
 
-## Deploy on Vercel
+- `app/` – Next.js App Router + UI.
+- `lib/prisma.ts` – helper Prisma Client berbasis singleton untuk mencegah multiple instans di dev.
+- `prisma/` – skema Prisma dan migrasi (ketika sudah dibuat).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Silakan sesuaikan README ini apabila ada perubahan arsitektur besar atau proses baru.
