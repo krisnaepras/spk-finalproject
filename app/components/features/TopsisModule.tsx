@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/Card";
 import { Button } from "../ui/Button";
-import { WorkspaceState, TopsisDetail, TopsisResult } from "@/lib/spk/types";
+import { Table, THead, TBody, Th, Td } from "../ui/Table";
+import { WorkspaceState, TopsisDetail, TopsisResult, Alternative, Criteria } from "@/lib/spk/types";
 
 type TopsisTab = "decision" | "normalized" | "weighted" | "ideal" | "distance" | "score";
 
@@ -38,7 +39,8 @@ export const TopsisModule = ({
       );
     }
 
-    const { detail, results } = { detail: workspace.topsisDetail, results: workspace.topsisResults };
+    const detail: TopsisDetail = workspace.topsisDetail;
+    const results: TopsisResult[] = workspace.topsisResults;
 
     // Use the alternatives and criteria from the detail to ensure index alignment
     const alternatives = detail.alternatives;
@@ -91,107 +93,114 @@ export const TopsisModule = ({
 
 // Helper Components for Tables
 
-const MatrixTable = ({ data, criteria, alternatives }: any) => (
-  <div className="overflow-x-auto rounded-md border">
-    <table className="w-full text-sm text-left">
-      <thead className="bg-slate-50 text-muted-foreground">
+type MatrixTableProps = {
+  data: number[][];
+  criteria: Criteria[];
+  alternatives: Alternative[];
+};
+
+const MatrixTable = ({ data, criteria, alternatives }: MatrixTableProps) => (
+  <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+    <Table>
+      <THead>
         <tr>
-          <th className="h-12 px-4 align-middle font-medium">Alternatif</th>
-          {criteria.map((c: any) => (
-            <th key={c.id} className="h-12 px-4 align-middle font-medium">{c.code}</th>
+          <Th>Alternatif</Th>
+          {criteria.map((c) => (
+            <Th key={c.id}>{c.code}</Th>
           ))}
         </tr>
-      </thead>
-      <tbody>
-        {alternatives.map((alt: any, rowIndex: number) => (
-          <tr key={alt.id} className="border-t border-slate-200 hover:bg-slate-50 transition-colors">
-            <td className="p-4 font-medium">{alt.code}</td>
-            {criteria.map((c: any, colIndex: number) => (
-              <td key={c.id} className="p-4">
-                {data[rowIndex]?.[colIndex]?.toFixed(4) ?? "-"}
-              </td>
+      </THead>
+      <TBody>
+        {alternatives.map((alt, rowIndex) => (
+          <tr key={alt.id} className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+            <Td className="font-medium">{alt.code}</Td>
+            {criteria.map((c, colIndex) => (
+              <Td key={c.id}>{data[rowIndex]?.[colIndex]?.toFixed(4) ?? "-"}</Td>
             ))}
           </tr>
         ))}
-      </tbody>
-    </table>
+      </TBody>
+    </Table>
   </div>
 );
 
-const IdealSolutionTable = ({ idealPositive, idealNegative, criteria }: any) => (
-  <div className="overflow-x-auto rounded-md border">
-    <table className="w-full text-sm text-left">
-      <thead className="bg-slate-50 text-muted-foreground">
+type IdealProps = { idealPositive: number[]; idealNegative: number[]; criteria: Criteria[] };
+const IdealSolutionTable = ({ idealPositive, idealNegative, criteria }: IdealProps) => (
+  <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+    <Table>
+      <THead>
         <tr>
-          <th className="h-12 px-4 align-middle font-medium">Solusi Ideal</th>
-          {criteria.map((c: any) => (
-            <th key={c.id} className="h-12 px-4 align-middle font-medium">{c.code}</th>
+          <Th>Solusi Ideal</Th>
+          {criteria.map((c) => (
+            <Th key={c.id}>{c.code}</Th>
           ))}
         </tr>
-      </thead>
-      <tbody>
-        <tr className="border-t border-slate-200 hover:bg-slate-50 transition-colors">
-          <td className="p-4 font-medium text-emerald-600">Positif (A+)</td>
-          {criteria.map((c: any, index: number) => (
-            <td key={c.id} className="p-4 font-mono">{idealPositive[index]?.toFixed(4)}</td>
+      </THead>
+      <TBody>
+        <tr className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+          <Td className="font-medium text-emerald-600">Positif (A+)</Td>
+          {criteria.map((c, index) => (
+            <Td key={c.id} className="font-mono">{idealPositive[index]?.toFixed(4)}</Td>
           ))}
         </tr>
-        <tr className="border-t border-slate-200 hover:bg-slate-50 transition-colors">
-          <td className="p-4 font-medium text-rose-600">Negatif (A-)</td>
-          {criteria.map((c: any, index: number) => (
-            <td key={c.id} className="p-4 font-mono">{idealNegative[index]?.toFixed(4)}</td>
+        <tr className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+          <Td className="font-medium text-rose-600">Negatif (A-)</Td>
+          {criteria.map((c, index) => (
+            <Td key={c.id} className="font-mono">{idealNegative[index]?.toFixed(4)}</Td>
           ))}
         </tr>
-      </tbody>
-    </table>
+      </TBody>
+    </Table>
   </div>
 );
 
-const DistanceTable = ({ distancePositive, distanceNegative, alternatives }: any) => (
-  <div className="overflow-x-auto rounded-md border">
-    <table className="w-full text-sm text-left">
-      <thead className="bg-slate-50 text-muted-foreground">
+type DistanceProps = { distancePositive: number[]; distanceNegative: number[]; alternatives: Alternative[] };
+const DistanceTable = ({ distancePositive, distanceNegative, alternatives }: DistanceProps) => (
+  <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+    <Table>
+      <THead>
         <tr>
-          <th className="h-12 px-4 align-middle font-medium">Alternatif</th>
-          <th className="h-12 px-4 align-middle font-medium">Jarak ke A+ (D+)</th>
-          <th className="h-12 px-4 align-middle font-medium">Jarak ke A- (D-)</th>
+          <Th>Alternatif</Th>
+          <Th>Jarak ke A+ (D+)</Th>
+          <Th>Jarak ke A- (D-)</Th>
         </tr>
-      </thead>
-      <tbody>
-        {alternatives.map((alt: any, index: number) => (
-          <tr key={alt.id} className="border-t border-slate-200 hover:bg-slate-50 transition-colors">
-            <td className="p-4 font-medium">{alt.name} ({alt.code})</td>
-            <td className="p-4 font-mono">{distancePositive[index]?.toFixed(4)}</td>
-            <td className="p-4 font-mono">{distanceNegative[index]?.toFixed(4)}</td>
+      </THead>
+      <TBody>
+        {alternatives.map((alt, index) => (
+          <tr key={alt.id} className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+            <Td className="font-medium">{alt.name} ({alt.code})</Td>
+            <Td className="font-mono">{distancePositive[index]?.toFixed(4)}</Td>
+            <Td className="font-mono">{distanceNegative[index]?.toFixed(4)}</Td>
           </tr>
         ))}
-      </tbody>
-    </table>
+      </TBody>
+    </Table>
   </div>
 );
 
-const ScoreTable = ({ results, alternatives }: any) => (
-  <div className="overflow-x-auto rounded-md border">
-    <table className="w-full text-sm text-left">
-      <thead className="bg-slate-50 text-muted-foreground">
+type ScoreProps = { results: TopsisResult[]; alternatives: Alternative[] };
+const ScoreTable = ({ results, alternatives }: ScoreProps) => (
+  <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+    <Table>
+      <THead>
         <tr>
-          <th className="h-12 px-4 align-middle font-medium">Peringkat</th>
-          <th className="h-12 px-4 align-middle font-medium">Alternatif</th>
-          <th className="h-12 px-4 align-middle font-medium">Nilai Preferensi (V)</th>
+          <Th>Peringkat</Th>
+          <Th>Alternatif</Th>
+          <Th>Nilai Preferensi (V)</Th>
         </tr>
-      </thead>
-      <tbody>
-        {results.map((res: any, idx: number) => {
-          const alt = alternatives.find((a: any) => a.id === res.alternativeId);
+      </THead>
+      <TBody>
+        {results.map((res, idx) => {
+          const alt = alternatives.find((a) => a.id === res.alternativeId);
           return (
-            <tr key={res.alternativeId} className="border-t border-slate-200 hover:bg-slate-50 transition-colors">
-              <td className="p-4 font-bold">#{idx + 1}</td>
-              <td className="p-4">{alt?.name} ({alt?.code})</td>
-              <td className="p-4 font-mono font-semibold text-primary">{res.score.toFixed(4)}</td>
+            <tr key={res.alternativeId} className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+              <Td className="font-bold">#{idx + 1}</Td>
+              <Td>{alt?.name} ({alt?.code})</Td>
+              <Td className="font-mono font-semibold text-primary">{res.score.toFixed(4)}</Td>
             </tr>
           );
         })}
-      </tbody>
-    </table>
+      </TBody>
+    </Table>
   </div>
 );

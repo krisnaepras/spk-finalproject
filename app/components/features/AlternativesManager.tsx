@@ -2,6 +2,7 @@ import { FormEvent } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/Card";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
+import { Table, THead, TBody, Th, Td } from "../ui/Table";
 import { Alternative } from "@/lib/spk/types";
 
 interface AlternativesManagerProps {
@@ -12,7 +13,7 @@ interface AlternativesManagerProps {
     name: string;
     description?: string;
   };
-  onFormChange: (form: any) => void;
+  onFormChange: (form: AlternativesManagerProps["form"]) => void;
   onSubmit: (e: FormEvent<HTMLFormElement>) => void;
   onDelete: (id: string) => void;
   onReset: () => void;
@@ -98,30 +99,33 @@ export const AlternativesManager = ({
           </Button>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50 text-muted-foreground">
+          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+            <Table>
+              <THead>
                 <tr>
-                  <th className="h-12 px-4 align-middle font-medium">Kode</th>
-                  <th className="h-12 px-4 align-middle font-medium">Nama</th>
-                  <th className="h-12 px-4 align-middle font-medium">Deskripsi</th>
-                  <th className="h-12 px-4 align-middle font-medium text-right">Aksi</th>
+                  <Th>Kode</Th>
+                  <Th>Nama</Th>
+                  <Th>Deskripsi</Th>
+                  <Th className="text-right">Aksi</Th>
                 </tr>
-              </thead>
-              <tbody>
+              </THead>
+              <TBody>
                 {alternatives.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="p-4 text-center text-muted-foreground">
+                    <Td colSpan={4} className="p-6 text-center text-muted-foreground">
                       Belum ada data alternatif.
-                    </td>
+                    </Td>
                   </tr>
                 ) : (
                   alternatives.map((alt) => (
-                    <tr key={alt.id} className="border-t border-slate-200 hover:bg-slate-50 transition-colors">
-                      <td className="p-4 font-medium">{alt.code}</td>
-                      <td className="p-4">{alt.name}</td>
-                      <td className="p-4 text-muted-foreground">{alt.description || "-"}</td>
-                      <td className="p-4 text-right">
+                    <tr
+                      key={alt.id}
+                      className="border-t border-slate-100 hover:bg-slate-50 transition-colors"
+                    >
+                      <Td className="font-medium">{alt.code}</Td>
+                      <Td>{alt.name}</Td>
+                      <Td className="text-muted-foreground">{alt.description || "-"}</Td>
+                      <Td className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button
                             variant="ghost"
@@ -145,12 +149,12 @@ export const AlternativesManager = ({
                             Hapus
                           </Button>
                         </div>
-                      </td>
+                      </Td>
                     </tr>
                   ))
                 )}
-              </tbody>
-            </table>
+              </TBody>
+            </Table>
           </div>
         </CardContent>
       </Card>

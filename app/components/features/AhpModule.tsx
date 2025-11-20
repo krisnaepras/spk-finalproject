@@ -3,8 +3,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/Card";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
+import { Table, THead, TBody, Th, Td } from "../ui/Table";
 import { Criteria, WorkspaceState } from "@/lib/spk/types";
 import { useState } from "react";
+import { Modal } from "../ui/Modal";
 
 interface AhpModuleProps {
   criteria: Criteria[];
@@ -36,6 +38,8 @@ export const AhpModule = ({
   const [aiRecommendations, setAiRecommendations] = useState<AiRecommendation[] | null>(null);
   const [aiNote, setAiNote] = useState<string>("");
   const [aiError, setAiError] = useState<string>("");
+  const [isAiPromptOpen, setIsAiPromptOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("Berikan saran perbandingan yang logis.");
 
   const percentFormatter = new Intl.NumberFormat("id-ID", {
     style: "percent",
@@ -44,6 +48,7 @@ export const AhpModule = ({
   });
 
   const handleGetAiRecommendation = async () => {
+    setIsAiPromptOpen(false);
     setIsLoadingAi(true);
     setAiError("");
     setAiRecommendations(null);
@@ -55,6 +60,7 @@ export const AhpModule = ({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          prompt: aiPrompt,
           criteria: criteria.map(c => ({
             id: c.id,
             code: c.code,
@@ -99,6 +105,29 @@ export const AhpModule = ({
 
   return (
     <div className="space-y-6">
+      <Modal
+        isOpen={isAiPromptOpen}
+        onClose={() => setIsAiPromptOpen(false)}
+        title="Masukkan arahan AI (opsional)"
+        description="Tambahkan preferensi khusus, contoh: “Saya ingin condong ke review orang lain”."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setIsAiPromptOpen(false)}>
+              Batal
+            </Button>
+            <Button onClick={handleGetAiRecommendation} disabled={isLoadingAi}>
+              {isLoadingAi ? "Memuat..." : "Minta Rekomendasi"}
+            </Button>
+          </>
+        }
+      >
+        <Input
+          value={aiPrompt}
+          onChange={(e) => setAiPrompt(e.target.value)}
+          placeholder="Masukkan arah preferensi AI..."
+        />
+      </Modal>
+
       <Card>
         <CardHeader>
           <CardTitle>Matriks Perbandingan Berpasangan</CardTitle>
@@ -118,7 +147,7 @@ export const AhpModule = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleGetAiRecommendation}
+                  onClick={() => setIsAiPromptOpen(true)}
                   disabled={isLoadingAi}
                 >
                   {isLoadingAi ? (
@@ -187,24 +216,24 @@ export const AhpModule = ({
                 </div>
               )}
 
-              <div className="overflow-x-auto rounded-md border">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-slate-50 text-muted-foreground">
+              <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+                <Table>
+                  <THead>
                     <tr>
-                      <th className="h-12 px-4 align-middle font-medium">Kriteria</th>
+                      <Th>Kriteria</Th>
                       {criteria.map((c) => (
-                        <th key={c.id} className="h-12 px-4 align-middle font-medium min-w-[100px]">
+                        <Th key={c.id} className="min-w-[100px]">
                           {c.code}
-                        </th>
+                        </Th>
                       ))}
                     </tr>
-                  </thead>
-                  <tbody>
+                  </THead>
+                  <TBody>
                     {criteria.map((row, i) => (
-                      <tr key={row.id} className="border-t border-slate-200 hover:bg-slate-50 transition-colors">
-                        <td className="p-4 font-medium">
+                      <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+                        <Td className="font-medium">
                           {row.name} ({row.code})
-                        </td>
+                        </Td>
                         {criteria.map((col, j) => {
                           const isDiagonal = i === j;
                           const isLowerTriangle = i > j;
@@ -212,7 +241,7 @@ export const AhpModule = ({
                             pairwiseMatrix[row.id]?.[col.id] ?? (isDiagonal ? 1 : 0);
 
                           return (
-                            <td key={col.id} className="p-2">
+                            <Td key={col.id} className="p-2">
                               <Input
                                 type="number"
                                 min="0.1"
@@ -225,13 +254,13 @@ export const AhpModule = ({
                                   onPairwiseChange(row.id, col.id, parseFloat(e.target.value))
                                 }
                               />
-                            </td>
+                            </Td>
                           );
                         })}
                       </tr>
                     ))}
-                  </tbody>
-                </table>
+                  </TBody>
+                </Table>
               </div>
             </>
           )}

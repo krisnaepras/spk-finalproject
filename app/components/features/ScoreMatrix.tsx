@@ -1,5 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/Card";
 import { Input } from "../ui/Input";
+import { Table, THead, TBody, Th, Td } from "../ui/Table";
 import { Alternative, Criteria, WorkspaceState } from "@/lib/spk/types";
 
 interface ScoreMatrixProps {
@@ -29,28 +30,28 @@ export const ScoreMatrix = ({
             Harap lengkapi data alternatif dan kriteria terlebih dahulu.
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-md border">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50 text-muted-foreground">
+          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+            <Table>
+              <THead>
                 <tr>
-                  <th className="h-12 px-4 align-middle font-medium min-w-[150px]">Alternatif</th>
+                  <Th className="min-w-[150px]">Alternatif</Th>
                   {criteria.map((c) => (
-                    <th key={c.id} className="h-12 px-4 align-middle font-medium min-w-[120px]">
+                    <Th key={c.id} className="min-w-[120px]">
                       {c.name} ({c.code})
-                    </th>
+                    </Th>
                   ))}
                 </tr>
-              </thead>
-              <tbody>
+              </THead>
+              <TBody>
                 {alternatives.map((alt) => (
-                  <tr key={alt.id} className="border-t border-slate-200 hover:bg-slate-50 transition-colors">
-                    <td className="p-4 font-medium">
+                  <tr key={alt.id} className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+                    <Td className="font-medium">
                       {alt.name} <span className="text-muted-foreground text-xs">({alt.code})</span>
-                    </td>
+                    </Td>
                     {criteria.map((c) => {
                       const val = scores[alt.id]?.[c.id];
                       return (
-                        <td key={c.id} className="p-2">
+                        <Td key={c.id} className="p-2">
                           <Input
                             type="number"
                             step="any"
@@ -59,13 +60,13 @@ export const ScoreMatrix = ({
                             onChange={(e) => onScoreChange(alt.id, c.id, e.target.value)}
                             placeholder="0"
                           />
-                        </td>
+                        </Td>
                       );
                     })}
                   </tr>
                 ))}
-              </tbody>
-            </table>
+              </TBody>
+            </Table>
           </div>
         )}
       </CardContent>

@@ -16,18 +16,27 @@ type Recommendation = {
   reason: string;
 };
 
-const buildHeuristic = (criteria: CriteriaInput[]): Recommendation[] => {
+const buildHeuristic = (criteria: CriteriaInput[], bias?: Record<string, number>): Recommendation[] => {
   const recs: Recommendation[] = [];
   for (let i = 0; i < criteria.length; i++) {
     for (let j = i + 1; j < criteria.length; j++) {
       const a = criteria[i];
       const b = criteria[j];
-      // simple heuristic: benefit beats cost, earlier item slightly preferred
+      const biasA = bias?.[a.id] || bias?.[a.code] || 0;
+      const biasB = bias?.[b.id] || bias?.[b.code] || 0;
+
+      // base heuristic: benefit beats cost, earlier item slightly preferred
       let value = 1;
       if (a.type === "BENEFIT" && b.type === "COST") value = 5;
       else if (a.type === "COST" && b.type === "BENEFIT") value = 1 / 5;
       else if (i < j) value = 3;
       else value = 1 / 3;
+
+      // apply prompt bias: push higher value toward mentioned criterion
+      const delta = biasA - biasB;
+      if (delta > 0.5) value = Math.min(9, value * 2);
+      else if (delta < -0.5) value = Math.max(1 / 9, value / 2);
+
       recs.push({
         row: a.code,
         col: b.code,
@@ -39,14 +48,16 @@ const buildHeuristic = (criteria: CriteriaInput[]): Recommendation[] => {
   return recs;
 };
 
-const promptText = (criteria: CriteriaInput[]) => {
+const promptText = (criteria: CriteriaInput[], userPrompt?: string) => {
   const list = criteria
     .map((c, idx) => `${idx + 1}. ${c.code} - ${c.name} (${c.type.toLowerCase()})`)
     .join("\n");
   return `Berikan rekomendasi perbandingan berpasangan (skala 1-9, atau nilai pecahan 1/2, 1/3, dst) untuk kriteria berikut:
 ${list}
 
-Keluarkan dalam format satu per baris: CODE_A | CODE_B | nilai | alasan singkat. Jangan beri teks lain.`;
+Preferensi pengguna (jika ada): ${userPrompt || "gunakan pertimbangan umum"}
+
+Jelaskan alasan singkat dan keluarkan dalam format satu per baris: CODE_A | CODE_B | nilai | alasan singkat. Jangan beri teks lain.`;
 };
 
 const parseGemini = (text: string): Recommendation[] => {
@@ -71,6 +82,36 @@ const parseGemini = (text: string): Recommendation[] => {
     .filter((item): item is Recommendation => Boolean(item));
 };
 
+const buildBiasScores = (criteria: CriteriaInput[], userPrompt: string) => {
+  if (!userPrompt) return {};
+  const promptLower = userPrompt.toLowerCase();
+  const biasScores: Record<string, number> = {};
+  criteria.forEach((c) => {
+    const textPool = [c.code, c.name, c.description].filter(Boolean).map((t) => (t as string).toLowerCase());
+    const hasHit = textPool.some((t) => promptLower.includes(t));
+    if (hasHit) {
+      // COST diberi bobot lebih jika disebut, agar dorong preferensi hemat/efisien
+      const score = c.type === "COST" ? 3 : 2;
+      biasScores[c.id] = score;
+      biasScores[c.code] = score;
+    }
+  });
+  return biasScores;
+};
+
+const adjustWithBias = (recs: Recommendation[], bias?: Record<string, number>) => {
+  if (!bias) return recs;
+  return recs.map((rec) => {
+    const biasRow = bias[rec.row] || 0;
+    const biasCol = bias[rec.col] || 0;
+    let value = rec.value;
+    const delta = biasRow - biasCol;
+    if (delta > 0.5) value = Math.min(9, value * 2.5);
+    else if (delta < -0.5) value = Math.max(1 / 9, value / 2.5);
+    return { ...rec, value };
+  });
+};
+
 export async function POST(req: Request) {
   try {
     let body: unknown;
@@ -83,9 +124,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const payload = body as { criteria?: unknown };
+    const payload = body as { criteria?: unknown; prompt?: unknown };
     const rawCriteria = payload?.criteria;
     const criteria: CriteriaInput[] = Array.isArray(rawCriteria) ? (rawCriteria as CriteriaInput[]) : [];
+    const userPrompt = typeof payload?.prompt === "string" ? payload.prompt.trim() : "";
 
     if (!criteria.length) {
       return NextResponse.json(
@@ -96,15 +138,19 @@ export async function POST(req: Request) {
 
     const hasApiKey = Boolean(process.env.GEMINI_API_KEY);
     let note = "Heuristik otomatis berdasarkan tipe benefit/cost.";
-    let recommendations: Recommendation[] = buildHeuristic(criteria);
+    const biasScores = buildBiasScores(criteria, userPrompt);
+
+    let recommendations: Recommendation[] = buildHeuristic(criteria, biasScores);
 
     if (hasApiKey) {
       try {
-        const aiText = await generateGeminiText(promptText(criteria));
+        const aiText = await generateGeminiText(promptText(criteria, userPrompt));
         const parsed = parseGemini(aiText || "");
         if (parsed.length) {
-          recommendations = parsed;
-          note = "Rekomendasi AI dari Gemini (bisa diedit sebelum diterapkan).";
+          recommendations = adjustWithBias(parsed, biasScores);
+          note = userPrompt
+            ? `Rekomendasi AI (dipandu prompt): "${userPrompt}"`
+            : "Rekomendasi AI dari Gemini (bisa diedit sebelum diterapkan).";
         } else {
           note = "Gagal mem-parsing hasil AI, menggunakan heuristik bawaan.";
         }
@@ -113,7 +159,9 @@ export async function POST(req: Request) {
         note = "Gagal memanggil AI, menggunakan heuristik bawaan.";
       }
     } else {
-      note = "GEMINI_API_KEY belum tersedia, menggunakan heuristik bawaan.";
+      note = userPrompt
+        ? `GEMINI_API_KEY belum tersedia, heuristik mengikuti preferensi: "${userPrompt}"`
+        : "GEMINI_API_KEY belum tersedia, menggunakan heuristik bawaan.";
     }
 
     return NextResponse.json({

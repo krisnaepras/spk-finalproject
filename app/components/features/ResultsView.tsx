@@ -1,5 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/Card";
 import { Badge } from "../ui/Badge";
+import { Table, THead, TBody, Th, Td } from "../ui/Table";
 import { WorkspaceState } from "@/lib/spk/types";
 
 interface ResultsViewProps {
@@ -53,32 +54,32 @@ export const ResultsView = ({ workspace }: ResultsViewProps) => {
           <CardTitle>Peringkat Lengkap</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto rounded-md border">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50 text-muted-foreground">
+          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+            <Table>
+              <THead>
                 <tr>
-                  <th className="h-12 px-4 align-middle font-medium">Peringkat</th>
-                  <th className="h-12 px-4 align-middle font-medium">Kode</th>
-                  <th className="h-12 px-4 align-middle font-medium">Alternatif</th>
-                  <th className="h-12 px-4 align-middle font-medium">Skor Akhir</th>
+                  <Th>Peringkat</Th>
+                  <Th>Kode</Th>
+                  <Th>Alternatif</Th>
+                  <Th>Skor Akhir</Th>
                 </tr>
-              </thead>
-              <tbody>
+              </THead>
+              <TBody>
                 {results.map((res, idx) => {
                   const alt = workspace.alternatives.find((a) => a.id === res.alternativeId);
                   return (
-                    <tr key={res.alternativeId} className="border-t border-slate-200 hover:bg-slate-50 transition-colors">
-                      <td className="p-4 font-bold">#{idx + 1}</td>
-                      <td className="p-4 font-medium">{alt?.code}</td>
-                      <td className="p-4">{alt?.name}</td>
-                      <td className="p-4 font-mono font-semibold">
+                    <tr key={res.alternativeId} className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+                      <Td className="font-bold">#{idx + 1}</Td>
+                      <Td className="font-medium">{alt?.code}</Td>
+                      <Td>{alt?.name}</Td>
+                      <Td className="font-mono font-semibold">
                         {res.score.toFixed(4)}
-                      </td>
+                      </Td>
                     </tr>
                   );
                 })}
-              </tbody>
-            </table>
+              </TBody>
+            </Table>
           </div>
         </CardContent>
       </Card>

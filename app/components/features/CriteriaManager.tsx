@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { Badge } from "../ui/Badge";
+import { Table, THead, TBody, Th, Td } from "../ui/Table";
 import { Criteria, CriteriaType } from "@/lib/spk/types";
 
 interface CriteriaManagerProps {
@@ -14,7 +15,7 @@ interface CriteriaManagerProps {
     description?: string;
     type: CriteriaType;
   };
-  onFormChange: (form: any) => void;
+  onFormChange: (form: CriteriaManagerProps["form"]) => void;
   onSubmit: (e: FormEvent<HTMLFormElement>) => void;
   onDelete: (id: string) => void;
   onReset: () => void;
@@ -98,38 +99,36 @@ export const CriteriaManager = ({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50 text-muted-foreground">
+          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+            <Table>
+              <THead>
                 <tr>
-                  <th className="h-12 px-4 align-middle font-medium">Kode</th>
-                  <th className="h-12 px-4 align-middle font-medium">Nama</th>
-                  <th className="h-12 px-4 align-middle font-medium">Tipe</th>
-                  <th className="h-12 px-4 align-middle font-medium">Bobot (AHP)</th>
-                  <th className="h-12 px-4 align-middle font-medium text-right">Aksi</th>
+                  <Th>Kode</Th>
+                  <Th>Nama</Th>
+                  <Th>Tipe</Th>
+                  <Th>Bobot (AHP)</Th>
+                  <Th className="text-right">Aksi</Th>
                 </tr>
-              </thead>
-              <tbody>
+              </THead>
+              <TBody>
                 {criteria.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="p-4 text-center text-muted-foreground">
+                    <Td colSpan={5} className="p-6 text-center text-muted-foreground">
                       Belum ada data kriteria.
-                    </td>
+                    </Td>
                   </tr>
                 ) : (
                   criteria.map((item) => (
-                    <tr key={item.id} className="border-t border-slate-200 hover:bg-slate-50 transition-colors">
-                      <td className="p-4 font-medium">{item.code}</td>
-                      <td className="p-4">{item.name}</td>
-                      <td className="p-4">
+                    <tr key={item.id} className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+                      <Td className="font-medium">{item.code}</Td>
+                      <Td>{item.name}</Td>
+                      <Td>
                         <Badge variant={item.type === "BENEFIT" ? "success" : "destructive"}>
                           {item.type}
                         </Badge>
-                      </td>
-                      <td className="p-4">
-                        {item.weight ? (item.weight * 100).toFixed(2) + "%" : "-"}
-                      </td>
-                      <td className="p-4 text-right">
+                      </Td>
+                      <Td>{item.weight ? (item.weight * 100).toFixed(2) + "%" : "-"}</Td>
+                      <Td className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button
                             variant="ghost"
@@ -154,12 +153,12 @@ export const CriteriaManager = ({
                             Hapus
                           </Button>
                         </div>
-                      </td>
+                      </Td>
                     </tr>
                   ))
                 )}
-              </tbody>
-            </table>
+              </TBody>
+            </Table>
           </div>
         </CardContent>
       </Card>
