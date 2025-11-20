@@ -372,16 +372,19 @@ export default function Home() {
       }));
 
       const combinedAlternatives = [...prev.alternatives, ...newAlternatives];
-      
-      // If criteria are  imported, replace existing criteria
-      const criteriaToUse = importedData.criteria && importedData.criteria.length > 0
-        ? importedData.criteria
-        : prev.criteria;
-      
-      // Merge scores if provided
-      const scoresToUse = importedData.scores
-        ? { ...prev.scores, ...importedData.scores }
-        : syncScoresStructure(combinedAlternatives, prev.criteria, prev.scores);
+
+      let criteriaToUse =
+        importedData.criteria && importedData.criteria.length > 0
+          ? importedData.criteria.slice(0, MAX_CRITERIA)
+          : prev.criteria;
+
+      criteriaToUse = criteriaToUse.map((item, index) => ({
+        ...item,
+        position: index,
+      }));
+
+      const mergedScores = importedData.scores ? { ...prev.scores, ...importedData.scores } : prev.scores;
+      const scoresToUse = syncScoresStructure(combinedAlternatives, criteriaToUse, mergedScores);
 
       return {
         ...prev,

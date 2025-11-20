@@ -1,133 +1,121 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { generateGeminiText } from "@/lib/ai/gemini";
 
-interface CriteriaInput {
+type CriteriaInput = {
   id: string;
   code: string;
   name: string;
   description?: string;
   type: "BENEFIT" | "COST";
-}
+};
 
-interface RequestBody {
-  criteria: CriteriaInput[];
-}
+type Recommendation = {
+  row: string;
+  col: string;
+  value: number;
+  reason: string;
+};
 
-export async function POST(request: NextRequest) {
+const buildHeuristic = (criteria: CriteriaInput[]): Recommendation[] => {
+  const recs: Recommendation[] = [];
+  for (let i = 0; i < criteria.length; i++) {
+    for (let j = i + 1; j < criteria.length; j++) {
+      const a = criteria[i];
+      const b = criteria[j];
+      // simple heuristic: benefit beats cost, earlier item slightly preferred
+      let value = 1;
+      if (a.type === "BENEFIT" && b.type === "COST") value = 5;
+      else if (a.type === "COST" && b.type === "BENEFIT") value = 1 / 5;
+      else if (i < j) value = 3;
+      else value = 1 / 3;
+      recs.push({
+        row: a.code,
+        col: b.code,
+        value,
+        reason: "Heuristik cepat (Benefit vs Cost & urutan input).",
+      });
+    }
+  }
+  return recs;
+};
+
+const promptText = (criteria: CriteriaInput[]) => {
+  const list = criteria
+    .map((c, idx) => `${idx + 1}. ${c.code} - ${c.name} (${c.type.toLowerCase()})`)
+    .join("\n");
+  return `Berikan rekomendasi perbandingan berpasangan (skala 1-9, atau nilai pecahan 1/2, 1/3, dst) untuk kriteria berikut:
+${list}
+
+Keluarkan dalam format satu per baris: CODE_A | CODE_B | nilai | alasan singkat. Jangan beri teks lain.`;
+};
+
+const parseGemini = (text: string): Recommendation[] => {
+  if (!text) return [];
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const parts = line.split("|").map((p) => p.trim());
+      if (parts.length < 3) return null;
+      const [row, col, rawValue, reasonRaw] = parts;
+      const value = Number(rawValue.replace(",", "."));
+      if (!Number.isFinite(value)) return null;
+      return {
+        row,
+        col,
+        value,
+        reason: reasonRaw || "Rekomendasi AI",
+      };
+    })
+    .filter((item): item is Recommendation => Boolean(item));
+};
+
+export async function POST(req: Request) {
   try {
-    const body = (await request.json()) as RequestBody;
-    const { criteria } = body;
+    const body = await req.json();
+    const criteria: CriteriaInput[] = Array.isArray(body?.criteria) ? body.criteria : [];
 
-    if (!criteria || criteria.length < 2) {
+    if (!criteria.length) {
       return NextResponse.json(
-        { error: "Minimal 2 kriteria diperlukan" },
-        { status: 400 }
+        { error: "Kriteria tidak ditemukan. Lengkapi kriteria terlebih dahulu." },
+        { status: 400 },
       );
     }
 
-    // Menggunakan Google Gemini API (gratis)
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-    
-    if (!GEMINI_API_KEY) {
-      return NextResponse.json(
-        { error: "API Key tidak ditemukan. Silakan tambahkan GEMINI_API_KEY di .env.local" },
-        { status: 500 }
-      );
-    }
+    const hasApiKey = Boolean(process.env.GEMINI_API_KEY);
+    let note = "Heuristik otomatis berdasarkan tipe benefit/cost.";
+    let recommendations: Recommendation[] = buildHeuristic(criteria);
 
-    // Format kriteria untuk prompt
-    const criteriaText = criteria
-      .map((c, i) => `${i + 1}. ${c.name} (${c.code})${c.description ? `: ${c.description}` : ""} - Tipe: ${c.type}`)
-      .join("\n");
-
-    const prompt = `Sebagai ahli dalam metode AHP (Analytical Hierarchy Process), berikan rekomendasi nilai perbandingan berpasangan untuk kriteria berikut dalam skala 1-9:
-
-${criteriaText}
-
-Skala perbandingan AHP:
-- 1: Sama penting
-- 3: Sedikit lebih penting
-- 5: Lebih penting
-- 7: Sangat lebih penting
-- 9: Mutlak lebih penting
-- 2,4,6,8: Nilai antara
-
-Berikan rekomendasi dalam format JSON dengan struktur berikut:
-{
-  "recommendations": [
-    {
-      "row": "kode_kriteria_baris",
-      "col": "kode_kriteria_kolom", 
-      "value": nilai_numerik,
-      "reason": "penjelasan singkat"
-    }
-  ],
-  "note": "catatan umum tentang perbandingan"
-}
-
-Hanya berikan pasangan matriks segitiga atas (row < col). Pertimbangkan tipe kriteria (BENEFIT/COST) dan deskripsi dalam memberikan rekomendasi.`;
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt,
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 2048,
-          },
-        }),
+    if (hasApiKey) {
+      try {
+        const aiText = await generateGeminiText(promptText(criteria));
+        const parsed = parseGemini(aiText);
+        if (parsed.length) {
+          recommendations = parsed;
+          note = "Rekomendasi AI dari Gemini (bisa diedit sebelum diterapkan).";
+        } else {
+          note = "Gagal mem-parsing hasil AI, menggunakan heuristik bawaan.";
+        }
+      } catch (err) {
+        console.error("AI recommend error:", err);
+        note = "Gagal memanggil AI, menggunakan heuristik bawaan.";
       }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error("Gemini API Error:", errorData);
-      return NextResponse.json(
-        { error: "Gagal mendapatkan rekomendasi dari AI" },
-        { status: 500 }
-      );
-    }
-
-    const data = await response.json();
-    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
-    // Parse JSON dari response AI
-    let parsedResponse;
-    try {
-      // Ekstrak JSON dari markdown code block jika ada
-      const jsonMatch = aiResponse.match(/```json\n?([\s\S]*?)\n?```/) || 
-                       aiResponse.match(/\{[\s\S]*\}/);
-      const jsonText = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : aiResponse;
-      parsedResponse = JSON.parse(jsonText);
-    } catch (parseError) {
-      console.error("Failed to parse AI response:", aiResponse);
-      return NextResponse.json(
-        { error: "Gagal memproses response AI", rawResponse: aiResponse },
-        { status: 500 }
-      );
+    } else {
+      note = "GEMINI_API_KEY belum tersedia, menggunakan heuristik bawaan.";
     }
 
     return NextResponse.json({
-      success: true,
-      data: parsedResponse,
+      data: {
+        recommendations,
+        note,
+      },
     });
   } catch (error) {
-    console.error("Error in AI recommendation:", error);
+    console.error("recommend-ahp error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Internal server error" },
-      { status: 500 }
+      { error: "Terjadi kesalahan memproses rekomendasi." },
+      { status: 500 },
     );
   }
 }

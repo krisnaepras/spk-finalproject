@@ -10,9 +10,22 @@ interface ModalProps {
   description?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  maxWidthClass?: string;
+  scrollable?: boolean;
+  contentClassName?: string;
 }
 
-export const Modal = ({ isOpen, onClose, title, description, children, footer }: ModalProps) => {
+export const Modal = ({
+  isOpen,
+  onClose,
+  title,
+  description,
+  children,
+  footer,
+  maxWidthClass = "max-w-lg",
+  scrollable = false,
+  contentClassName = "",
+}: ModalProps) => {
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -31,7 +44,7 @@ export const Modal = ({ isOpen, onClose, title, description, children, footer }:
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg animate-in zoom-in-95 duration-200">
+      <div className={`relative w-full ${maxWidthClass} animate-in zoom-in-95 duration-200`}>
         <Card className="w-full shadow-2xl border-slate-200">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -57,7 +70,11 @@ export const Modal = ({ isOpen, onClose, title, description, children, footer }:
             </div>
             {description && <CardDescription>{description}</CardDescription>}
           </CardHeader>
-          <CardContent>{children}</CardContent>
+          <CardContent
+            className={`${scrollable ? "max-h-[78vh] overflow-y-auto pr-1" : ""} ${contentClassName}`}
+          >
+            {children}
+          </CardContent>
           {footer && <CardFooter className="justify-end space-x-2">{footer}</CardFooter>}
         </Card>
       </div>
