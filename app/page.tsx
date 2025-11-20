@@ -84,6 +84,15 @@ export default function Home() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [authForm, setAuthForm] = useState({ username: "", password: "" });
   const [history, setHistory] = useState<WorkspaceHistoryItem[]>([]);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
+  const [historyNameInput, setHistoryNameInput] = useState("");
+  const [isNewCalcConfirmOpen, setIsNewCalcConfirmOpen] = useState(false);
+  const [isHistoryListOpen, setIsHistoryListOpen] = useState(false);
+  const [editingHistoryId, setEditingHistoryId] = useState<string | null>(null);
+  const [editingHistoryName, setEditingHistoryName] = useState("");
+  const [pendingDeleteHistoryId, setPendingDeleteHistoryId] = useState<string | null>(null);
+  const [pendingDeleteHistoryName, setPendingDeleteHistoryName] = useState<string | null>(null);
   const [alternativeForm, setAlternativeForm] = useState<AlternativeForm>(() =>
     defaultAlternativeForm("A1"),
   );
@@ -169,7 +178,7 @@ export default function Home() {
     }
   };
 
-   const handleNewCalculation = () => {
+  const handleNewCalculation = () => {
     const nextWorkspace = createInitialWorkspaceState();
     setWorkspace(nextWorkspace);
     setAlternativeForm(defaultAlternativeForm("A1"));
@@ -180,9 +189,8 @@ export default function Home() {
     setMainTab("dashboard");
     setIsImportOpen(false);
   };
-
-  const handleSaveHistory = () => {
-    const name = workspace.projectName || `Perhitungan ${history.length + 1}`;
+  
+  const performSaveHistory = (name: string) => {
     const now = new Date().toISOString();
     const item: WorkspaceHistoryItem = {
       id: crypto.randomUUID(),
@@ -196,7 +204,22 @@ export default function Home() {
       persistHistory(next);
       return next;
     });
+    setHasUnsavedChanges(false);
     setNotification(`Perhitungan "${name}" disimpan ke riwayat`);
+  };
+
+  const openSaveHistoryDialog = () => {
+    const defaultName = workspace.projectName || `Perhitungan ${history.length + 1}`;
+    setHistoryNameInput(defaultName);
+    setIsSaveDialogOpen(true);
+  };
+
+  const handleSaveHistorySubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = historyNameInput.trim();
+    const name = trimmed || workspace.projectName || `Perhitungan ${history.length + 1}`;
+    performSaveHistory(name);
+    setIsSaveDialogOpen(false);
   };
 
   const handleLoadHistory = (id: string) => {
@@ -210,6 +233,47 @@ export default function Home() {
     setMainTab("dashboard");
     setIsImportOpen(false);
     setNotification(`Perhitungan "${item.name}" dimuat dari riwayat`);
+    setHasUnsavedChanges(false);
+  };
+
+  const handleDeleteHistory = (id: string) => {
+    setHistory((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      persistHistory(next);
+      return next;
+    });
+    if (pendingDeleteHistoryId === id) {
+      setPendingDeleteHistoryId(null);
+      setPendingDeleteHistoryName(null);
+    }
+  };
+
+  const handleStartEditHistory = (item: WorkspaceHistoryItem) => {
+    setEditingHistoryId(item.id);
+    setEditingHistoryName(item.name);
+  };
+
+  const handleCancelEditHistory = () => {
+    setEditingHistoryId(null);
+    setEditingHistoryName("");
+  };
+
+  const handleSubmitEditHistory = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editingHistoryId) return;
+    const trimmed = editingHistoryName.trim();
+    const name = trimmed || "Tanpa nama";
+    const now = new Date().toISOString();
+    setHistory((prev) => {
+      const next = prev.map((item) =>
+        item.id === editingHistoryId ? { ...item, name, updatedAt: now } : item,
+      );
+      persistHistory(next);
+      return next;
+    });
+    setEditingHistoryId(null);
+    setEditingHistoryName("");
+    setNotification(`Nama riwayat diperbarui menjadi "${name}"`);
   };
 
   const handleAlternativeSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -246,6 +310,7 @@ export default function Home() {
 
     resetAlternativeForm();
     setNotification(editing ? "Alternatif diperbarui" : "Alternatif ditambahkan");
+    setHasUnsavedChanges(true);
   };
 
   const isAlternativeEdit = (form: AlternativeForm) => Boolean(form.id);
@@ -263,6 +328,7 @@ export default function Home() {
         topsisDetail: undefined,
       };
     });
+    setHasUnsavedChanges(true);
   };
 
   const handleCriteriaSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -315,6 +381,7 @@ export default function Home() {
     resetCriteriaForm();
     setNotification(editing ? "Kriteria diperbarui" : "Kriteria ditambahkan");
     setAhpOverrideApproved(false);
+    setHasUnsavedChanges(true);
   };
 
   const handleCriteriaDelete = (id: string) => {
@@ -335,6 +402,7 @@ export default function Home() {
       };
     });
     setAhpOverrideApproved(false);
+    setHasUnsavedChanges(true);
   };
 
   const handleScoreChange = (alternativeId: string, criteriaId: string, value: string) => {
@@ -352,6 +420,7 @@ export default function Home() {
       topsisResults: undefined,
       topsisDetail: undefined,
     }));
+    setHasUnsavedChanges(true);
   };
 
   const handlePairwiseChange = (rowId: string, colId: string, value: number) => {
@@ -364,6 +433,7 @@ export default function Home() {
       topsisDetail: undefined,
     }));
     setAhpOverrideApproved(false);
+    setHasUnsavedChanges(true);
   };
 
   const handleCalculateAhp = () => {
@@ -384,6 +454,7 @@ export default function Home() {
       }));
       setAhpOverrideApproved(result.isConsistent);
       setNotification("Bobot kriteria berhasil dihitung");
+      setHasUnsavedChanges(true);
     } catch (error) {
       if (error instanceof Error) {
         setNotification(error.message);
@@ -426,6 +497,7 @@ export default function Home() {
         topsisDetail: detail,
       }));
       setNotification("Perhitungan TOPSIS selesai");
+      setHasUnsavedChanges(true);
     } catch (error) {
       if (error instanceof Error) {
         setNotification(error.message);
@@ -458,6 +530,7 @@ export default function Home() {
     resetAlternativeForm();
     resetCriteriaForm();
     setNotification("Data berhasil diimpor");
+    setHasUnsavedChanges(true);
   };
 
   const topsisTabs: { id: TopsisTab; label: string }[] = [
@@ -536,7 +609,7 @@ export default function Home() {
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-6">
           <p className="text-sm font-semibold uppercase tracking-wide text-emerald-600">
-            Sistem Pendukung Keputusan Generik
+            Sistem Pendukung Keputusan Kelompok 5 (SPK D)
           </p>
           <div className="flex items-center justify-between gap-3">
             <h1 className="text-2xl font-bold text-slate-900">Dashboard SPK – AHP + TOPSIS</h1>
@@ -553,6 +626,10 @@ export default function Home() {
             sajikan hasil pemeringkatan dalam satu alur terpadu. Import data fleksibel dari Excel/CSV, JSON,
             maupun SQL.
           </p>
+          <p className="text-xs text-slate-500">
+            Studi kasus 3: pemilihan <span className="font-semibold">mobil ramah lingkungan</span> berdasarkan harga,
+            emisi CO₂, konsumsi BBM, dan faktor pendukung lainnya.
+          </p>
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
             <div className="flex flex-wrap gap-2">
               <button
@@ -564,16 +641,23 @@ export default function Home() {
               <button
                 type="button"
                 className="rounded-full border border-slate-200 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-100"
-                onClick={handleNewCalculation}
+                onClick={() => setIsNewCalcConfirmOpen(true)}
               >
                 Perhitungan Baru
               </button>
               <button
                 type="button"
                 className="rounded-full border border-slate-200 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-100"
-                onClick={handleSaveHistory}
+                onClick={openSaveHistoryDialog}
               >
                 Simpan ke Riwayat
+              </button>
+              <button
+                type="button"
+                className="rounded-full border border-slate-200 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-100"
+                onClick={() => setIsHistoryListOpen(true)}
+              >
+                Daftar Riwayat
               </button>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -1118,6 +1202,213 @@ export default function Home() {
           onClose={() => setIsImportOpen(false)}
           onApply={handleImportData}
         />
+      )}
+
+      {isSaveDialogOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 px-4">
+          <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-4 shadow-xl">
+            <h2 className="text-sm font-semibold text-slate-900">Simpan ke Riwayat</h2>
+            <p className="mt-1 text-xs text-slate-600">
+              Beri nama perhitungan ini agar mudah dikenali di daftar riwayat.
+            </p>
+            <form className="mt-3 space-y-3" onSubmit={handleSaveHistorySubmit}>
+              <label className="block text-sm">
+                <span className="text-slate-600">Nama perhitungan</span>
+                <input
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  value={historyNameInput}
+                  onChange={(event) => setHistoryNameInput(event.target.value)}
+                  autoFocus
+                />
+              </label>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                  onClick={() => setIsSaveDialogOpen(false)}
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
+                >
+                  Simpan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isHistoryListOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 px-4">
+          <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-4 shadow-xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-slate-900">Daftar Riwayat Perhitungan</h2>
+              <button
+                type="button"
+                className="text-xs font-semibold text-slate-500 hover:text-slate-700"
+                onClick={() => {
+                  setIsHistoryListOpen(false);
+                  setEditingHistoryId(null);
+                  setEditingHistoryName("");
+                }}
+              >
+                Tutup
+              </button>
+            </div>
+            {history.length === 0 ? (
+              <p className="text-xs text-slate-500">
+                Belum ada riwayat perhitungan. Simpan perhitungan saat ini dengan tombol{" "}
+                <span className="font-semibold">Simpan ke Riwayat</span>.
+              </p>
+            ) : (
+              <div className="max-h-[60vh] space-y-2 overflow-y-auto">
+                {history.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-start justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2"
+                  >
+                    {editingHistoryId === item.id ? (
+                      <form className="flex-1 space-y-1" onSubmit={handleSubmitEditHistory}>
+                        <input
+                          className="w-full rounded-md border border-slate-200 px-2 py-1 text-xs"
+                          value={editingHistoryName}
+                          onChange={(event) => setEditingHistoryName(event.target.value)}
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="submit"
+                            className="rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-500"
+                          >
+                            Simpan
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded-md border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100"
+                            onClick={handleCancelEditHistory}
+                          >
+                            Batal
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-slate-900">{item.name}</p>
+                        <p className="text-[11px] text-slate-500">
+                          Dibuat: {new Date(item.createdAt).toLocaleString("id-ID")}
+                        </p>
+                      </div>
+                    )}
+                    <div className="flex flex-col items-end gap-1">
+                      <button
+                        type="button"
+                        className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100"
+                        onClick={() => {
+                          handleLoadHistory(item.id);
+                          setIsHistoryListOpen(false);
+                        }}
+                      >
+                        Muat
+                      </button>
+                      {editingHistoryId !== item.id && (
+                        <button
+                          type="button"
+                          className="rounded-full border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100"
+                          onClick={() => handleStartEditHistory(item)}
+                        >
+                          Edit
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="rounded-full border border-rose-200 px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50"
+                        onClick={() => {
+                          setPendingDeleteHistoryId(item.id);
+                          setPendingDeleteHistoryName(item.name);
+                        }}
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {isNewCalcConfirmOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 px-4">
+          <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-4 shadow-xl">
+            <h2 className="text-sm font-semibold text-slate-900">Mulai Perhitungan Baru?</h2>
+            <p className="mt-1 text-xs text-slate-600">
+              {hasUnsavedChanges
+                ? "Perubahan yang belum disimpan ke riwayat akan hilang. Yakin ingin melanjutkan?"
+                : "Perhitungan saat ini akan direset. Lanjutkan membuat perhitungan baru?"}
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                onClick={() => setIsNewCalcConfirmOpen(false)}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-500"
+                onClick={() => {
+                  setIsNewCalcConfirmOpen(false);
+                  handleNewCalculation();
+                }}
+              >
+                Ya, Reset
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingDeleteHistoryId && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 px-4">
+          <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-4 shadow-xl">
+            <h2 className="text-sm font-semibold text-slate-900">Hapus Riwayat?</h2>
+            <p className="mt-1 text-xs text-slate-600">
+              {pendingDeleteHistoryName
+                ? `Riwayat "${pendingDeleteHistoryName}" akan dihapus dari daftar. Tindakan ini tidak dapat dibatalkan.`
+                : "Riwayat ini akan dihapus dari daftar. Tindakan ini tidak dapat dibatalkan."}
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                onClick={() => {
+                  setPendingDeleteHistoryId(null);
+                  setPendingDeleteHistoryName(null);
+                }}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-500"
+                onClick={() => {
+                  if (pendingDeleteHistoryId) {
+                    handleDeleteHistory(pendingDeleteHistoryId);
+                  }
+                  setPendingDeleteHistoryId(null);
+                  setPendingDeleteHistoryName(null);
+                }}
+              >
+                Hapus
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
