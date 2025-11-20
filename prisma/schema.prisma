@@ -5,8 +5,7 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client"
-  output   = "../node_modules/.prisma/client/default"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -16,6 +15,15 @@ datasource db {
 enum CriteriaType {
   BENEFIT
   COST
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model Project {
@@ -113,4 +121,12 @@ model TopsisResult {
   alternative Alternative @relation(fields: [alternativeId], references: [id], onDelete: Cascade)
 
   @@index([projectId, rank])
+}
+
+model WorkspaceHistory {
+  id        String   @id @default(cuid())
+  name      String
+  snapshot  Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 
@@ -54,6 +54,13 @@ type CriteriaForm = {
 
 type TopsisTab = "decision" | "normalized" | "weighted" | "ideal" | "distance" | "score";
 type MainTab = "dashboard" | "alternatives" | "criteria" | "scores" | "ahp" | "topsis" | "results";
+type WorkspaceHistoryItem = {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  workspace: WorkspaceState;
+};
 
 const defaultAlternativeForm = (code: string): AlternativeForm => ({
   id: "",
@@ -73,6 +80,10 @@ const defaultCriteriaForm = (code: string): CriteriaForm => ({
 export default function Home() {
   const [workspace, setWorkspace] = useState<WorkspaceState>(() => createInitialWorkspaceState());
   const [mainTab, setMainTab] = useState<MainTab>("dashboard");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authForm, setAuthForm] = useState({ username: "", password: "" });
+  const [history, setHistory] = useState<WorkspaceHistoryItem[]>([]);
   const [alternativeForm, setAlternativeForm] = useState<AlternativeForm>(() =>
     defaultAlternativeForm("A1"),
   );
@@ -95,6 +106,111 @@ export default function Home() {
 
   const resetAlternativeForm = () => setAlternativeForm(defaultAlternativeForm(""));
   const resetCriteriaForm = () => setCriteriaForm(defaultCriteriaForm(""));
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem("spk_auth");
+    if (stored === "true") {
+      setIsAuthenticated(true);
+    }
+    const historyRaw = window.localStorage.getItem("spk_history");
+    if (historyRaw) {
+      try {
+        const parsed = JSON.parse(historyRaw) as WorkspaceHistoryItem[];
+        if (Array.isArray(parsed)) {
+          setHistory(parsed);
+        }
+      } catch {
+        // ignore parse error
+      }
+    }
+  }, []);
+
+  const persistHistory = (items: WorkspaceHistoryItem[]) => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("spk_history", JSON.stringify(items));
+  };
+
+  const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAuthError(null);
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(authForm),
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({ message: "Login gagal." }));
+        setAuthError(body.message || "Login gagal.");
+        return;
+      }
+
+      setIsAuthenticated(true);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("spk_auth", "true");
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        setAuthError(error.message);
+      } else {
+        setAuthError("Login gagal.");
+      }
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("spk_auth");
+    }
+  };
+
+   const handleNewCalculation = () => {
+    const nextWorkspace = createInitialWorkspaceState();
+    setWorkspace(nextWorkspace);
+    setAlternativeForm(defaultAlternativeForm("A1"));
+    setCriteriaForm(defaultCriteriaForm("C1"));
+    setAhpOverrideApproved(false);
+    setNotification(null);
+    setTopsisTab("decision");
+    setMainTab("dashboard");
+    setIsImportOpen(false);
+  };
+
+  const handleSaveHistory = () => {
+    const name = workspace.projectName || `Perhitungan ${history.length + 1}`;
+    const now = new Date().toISOString();
+    const item: WorkspaceHistoryItem = {
+      id: crypto.randomUUID(),
+      name,
+      createdAt: now,
+      updatedAt: now,
+      workspace,
+    };
+    setHistory((prev) => {
+      const next = [item, ...prev];
+      persistHistory(next);
+      return next;
+    });
+    setNotification(`Perhitungan "${name}" disimpan ke riwayat`);
+  };
+
+  const handleLoadHistory = (id: string) => {
+    const item = history.find((entry) => entry.id === id);
+    if (!item) return;
+    setWorkspace(item.workspace);
+    setAlternativeForm(defaultAlternativeForm(`A${item.workspace.alternatives.length + 1}`));
+    setCriteriaForm(defaultCriteriaForm(`C${item.workspace.criteria.length + 1}`));
+    setAhpOverrideApproved(false);
+    setTopsisTab("decision");
+    setMainTab("dashboard");
+    setIsImportOpen(false);
+    setNotification(`Perhitungan "${item.name}" dimuat dari riwayat`);
+  };
 
   const handleAlternativeSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -239,7 +355,7 @@ export default function Home() {
   };
 
   const handlePairwiseChange = (rowId: string, colId: string, value: number) => {
-    if (!value || value <= 0) return;
+    if (Number.isNaN(value) || value < 0) return;
     setWorkspace((prev) => ({
       ...prev,
       pairwiseMatrix: updatePairwiseValue(prev.pairwiseMatrix, rowId, colId, value),
@@ -363,6 +479,58 @@ export default function Home() {
     { id: "results", label: "Hasil Pemeringkatan" },
   ];
 
+  if (!isAuthenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-900">
+        <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-600">
+            Sistem Pendukung Keputusan
+          </p>
+          <h1 className="mb-4 text-xl font-semibold text-slate-900">Masuk ke Dashboard SPK</h1>
+          <p className="mb-4 text-xs text-slate-500">
+            Gunakan akun sementara <span className="font-mono font-semibold">user1234 / user1234</span>.
+          </p>
+          {authError && (
+            <div className="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+              {authError}
+            </div>
+          )}
+          <form className="space-y-3" onSubmit={handleLogin}>
+            <label className="block text-sm">
+              <span className="text-slate-600">Username</span>
+              <input
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                autoComplete="username"
+                value={authForm.username}
+                onChange={(event) =>
+                  setAuthForm((prev) => ({ ...prev, username: event.target.value }))
+                }
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="text-slate-600">Password</span>
+              <input
+                type="password"
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                autoComplete="current-password"
+                value={authForm.password}
+                onChange={(event) =>
+                  setAuthForm((prev) => ({ ...prev, password: event.target.value }))
+                }
+              />
+            </label>
+            <button
+              type="submit"
+              className="mt-2 w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+            >
+              Masuk
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <header className="border-b border-slate-200 bg-white">
@@ -370,19 +538,44 @@ export default function Home() {
           <p className="text-sm font-semibold uppercase tracking-wide text-emerald-600">
             Sistem Pendukung Keputusan Generik
           </p>
-          <h1 className="text-2xl font-bold text-slate-900">Dashboard SPK – AHP + TOPSIS</h1>
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="text-2xl font-bold text-slate-900">Dashboard SPK – AHP + TOPSIS</h1>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+            >
+              Keluar
+            </button>
+          </div>
           <p className="max-w-3xl text-sm text-slate-600">
             Kelola data alternatif, tetapkan kriteria (maks. 5), hitung bobot AHP, jalankan TOPSIS, dan
             sajikan hasil pemeringkatan dalam satu alur terpadu. Import data fleksibel dari Excel/CSV, JSON,
             maupun SQL.
           </p>
-          <div className="flex flex-wrap gap-3 text-sm">
-            <button
-              className="rounded-full bg-emerald-600 px-4 py-2 font-semibold text-white shadow hover:bg-emerald-500"
-              onClick={() => setIsImportOpen(true)}
-            >
-              + Import Data
-            </button>
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="rounded-full bg-emerald-600 px-4 py-2 font-semibold text-white shadow hover:bg-emerald-500"
+                onClick={() => setIsImportOpen(true)}
+              >
+                + Import Data
+              </button>
+              <button
+                type="button"
+                className="rounded-full border border-slate-200 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-100"
+                onClick={handleNewCalculation}
+              >
+                Perhitungan Baru
+              </button>
+              <button
+                type="button"
+                className="rounded-full border border-slate-200 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-100"
+                onClick={handleSaveHistory}
+              >
+                Simpan ke Riwayat
+              </button>
+            </div>
             <div className="flex flex-wrap gap-2">
               {mainTabs.map((tab) => (
                 <button
@@ -436,6 +629,23 @@ export default function Home() {
               <StepCard label="Bobot AHP" status={workflowStatus.ahpReady} />
               <StepCard label="TOPSIS" status={workflowStatus.topsisReady} />
             </div>
+            {history.length > 0 && (
+              <div className="mt-4">
+                <h3 className="mb-2 text-sm font-semibold text-slate-900">Riwayat Perhitungan</h3>
+                <div className="flex flex-wrap gap-2">
+                  {history.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleLoadHistory(item.id)}
+                      className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                    >
+                      {item.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         )}
 
@@ -749,8 +959,8 @@ export default function Home() {
                             rowCriteria.id === columnCriteria.id
                               ? 1
                               : workspace.pairwiseMatrix[rowCriteria.id]?.[columnCriteria.id] ?? 1;
-                          const isEditable = columnIndex > rowIndex;
-                          return (
+                              const isEditable = columnIndex > rowIndex;
+                              return (
                             <td key={columnCriteria.id} className="px-3 py-2">
                               {isEditable ? (
                                 <input
@@ -759,6 +969,7 @@ export default function Home() {
                                   step="0.1"
                                   className="w-24 rounded-lg border border-slate-200 px-2 py-1 text-sm"
                                   value={value}
+                                  onFocus={(event) => event.target.select()}
                                   onChange={(event) =>
                                     handlePairwiseChange(
                                       rowCriteria.id,
