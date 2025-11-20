@@ -14,6 +14,8 @@ export const createInitialWorkspaceState = (): WorkspaceState => ({
   criteria: [],
   scores: {},
   pairwiseMatrix: {},
+  weightingMode: "AHP",
+  customWeights: {},
 });
 
 export function syncScoresStructure(
@@ -107,12 +109,50 @@ export function isScoreMatrixComplete(state: WorkspaceState): boolean {
   );
 }
 
+export function sanitizeCustomWeights(
+  criteria: Criteria[],
+  customWeights: WorkspaceState["customWeights"],
+): WorkspaceState["customWeights"] {
+  const ids = new Set(criteria.map((item) => item.id));
+  const sanitized: WorkspaceState["customWeights"] = {};
+
+  Object.entries(customWeights ?? {}).forEach(([criteriaId, value]) => {
+    if (!ids.has(criteriaId)) return;
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return;
+    sanitized[criteriaId] = numeric;
+  });
+
+  return sanitized;
+}
+
+export function areCustomWeightsReady(
+  criteria: Criteria[],
+  customWeights: WorkspaceState["customWeights"],
+): boolean {
+  if (!criteria.length) return false;
+  return criteria.every((crit) => {
+    const value = customWeights?.[crit.id];
+    return typeof value === "number" && Number.isFinite(value) && value > 0;
+  });
+}
+
 export function getWorkflowStatus(state: WorkspaceState): WorkflowStatus {
+  const ahpReady = Boolean(
+    state.ahpResult && Object.keys(state.ahpResult.weights).length === state.criteria.length,
+  );
+  const customReady = areCustomWeightsReady(state.criteria, state.customWeights ?? {});
+  const weightingReady =
+    state.weightingMode === "CUSTOM"
+      ? customReady
+      : ahpReady;
+
   return {
     alternativesReady: state.alternatives.length > 0,
     criteriaReady: state.criteria.length > 0,
     scoresReady: isScoreMatrixComplete(state),
-    ahpReady: Boolean(state.ahpResult && Object.keys(state.ahpResult.weights).length === state.criteria.length),
+    ahpReady,
+    weightingReady,
     topsisReady: Boolean(state.topsisResults?.length),
   };
 }

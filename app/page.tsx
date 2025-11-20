@@ -11,12 +11,15 @@ import {
   removeCriteriaFromMatrix,
   removeCriteriaFromScores,
   sanitizePairwiseMatrix,
+  sanitizeCustomWeights,
   syncScoresStructure,
+  areCustomWeightsReady,
 } from "@/lib/spk/workspace";
 import type {
   Alternative,
   Criteria,
   CriteriaType,
+  WeightingMode,
   WorkspaceState,
 } from "@/lib/spk/types";
 
@@ -197,6 +200,17 @@ export default function Home() {
   const resetCriteriaForm = () => setCriteriaForm(defaultCriteriaForm(""));
   const isAlternativeEdit = (form: AlternativeForm) => Boolean(form.id);
   const isCriteriaEdit = (form: CriteriaForm) => Boolean(form.id);
+  const ensureCustomWeights = (criteria: Criteria[], current: WorkspaceState["customWeights"]) => {
+    const sanitized = sanitizeCustomWeights(criteria, current);
+    if (!criteria.length) return sanitized;
+    const next = { ...sanitized };
+    criteria.forEach((crit) => {
+      if (next[crit.id] === undefined || next[crit.id] === null) {
+        next[crit.id] = 1;
+      }
+    });
+    return next;
+  };
 
   // --- Handlers ---
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
@@ -293,7 +307,13 @@ export default function Home() {
   const handleLoadHistory = (id: string) => {
     const item = history.find((entry) => entry.id === id);
     if (!item) return;
-    setWorkspace(item.workspace);
+    const hydratedWorkspace: WorkspaceState = {
+      ...createInitialWorkspaceState(),
+      ...item.workspace,
+      weightingMode: item.workspace.weightingMode ?? "AHP",
+      customWeights: ensureCustomWeights(item.workspace.criteria ?? [], item.workspace.customWeights ?? {}),
+    };
+    setWorkspace(hydratedWorkspace);
     setAlternativeForm(defaultAlternativeForm(`A${item.workspace.alternatives.length + 1}`));
     setCriteriaForm(defaultCriteriaForm(`C${item.workspace.criteria.length + 1}`));
     setAhpOverrideApproved(false);
@@ -402,6 +422,7 @@ export default function Home() {
 
       const mergedScores = importedData.scores ? { ...prev.scores, ...importedData.scores } : prev.scores;
       const scoresToUse = syncScoresStructure(combinedAlternatives, criteriaToUse, mergedScores);
+      const nextCustomWeights = ensureCustomWeights(criteriaToUse, prev.customWeights);
 
       return {
         ...prev,
@@ -410,6 +431,7 @@ export default function Home() {
         scores: scoresToUse,
         pairwiseMatrix: importedData.criteria ? sanitizePairwiseMatrix(criteriaToUse, {}) : prev.pairwiseMatrix,
         ahpResult: importedData.criteria ? undefined : prev.ahpResult,
+        customWeights: nextCustomWeights,
         topsisResults: undefined,
         topsisDetail: undefined,
       };
@@ -453,6 +475,7 @@ export default function Home() {
       const reindexedCriteria = criteriaCollection.map((item, index) => ({ ...item, position: index }));
       const scores = syncScoresStructure(prev.alternatives, reindexedCriteria, prev.scores);
       const pairwiseMatrix = sanitizePairwiseMatrix(reindexedCriteria, prev.pairwiseMatrix);
+      const customWeights = ensureCustomWeights(reindexedCriteria, prev.customWeights);
 
       return {
         ...prev,
@@ -460,6 +483,7 @@ export default function Home() {
         scores,
         pairwiseMatrix,
         ahpResult: undefined,
+        customWeights,
         topsisResults: undefined,
         topsisDetail: undefined,
       };
@@ -476,6 +500,7 @@ export default function Home() {
       const reindexed = criteria.map((item, index) => ({ ...item, position: index }));
       const scores = removeCriteriaFromScores(prev.scores, id);
       const pairwiseMatrix = removeCriteriaFromMatrix(prev.pairwiseMatrix, id);
+      const customWeights = sanitizeCustomWeights(reindexed, prev.customWeights);
 
       return {
         ...prev,
@@ -483,6 +508,7 @@ export default function Home() {
         scores,
         pairwiseMatrix,
         ahpResult: undefined,
+        customWeights,
         topsisResults: undefined,
         topsisDetail: undefined,
       };
@@ -518,6 +544,30 @@ export default function Home() {
     setAhpOverrideApproved(false);
   };
 
+  const handleWeightingModeChange = (mode: WeightingMode) => {
+    setWorkspace((prev) => ({
+      ...prev,
+      weightingMode: mode,
+      customWeights: mode === "CUSTOM" ? ensureCustomWeights(prev.criteria, prev.customWeights) : prev.customWeights,
+      topsisResults: undefined,
+      topsisDetail: undefined,
+    }));
+    setNotification(mode === "CUSTOM" ? "Skenario bobot: Custom manual" : "Skenario bobot: AHP");
+  };
+
+  const handleCustomWeightChange = (criteriaId: string, value: string) => {
+    const parsedValue = value === "" ? null : Number(value);
+    setWorkspace((prev) => ({
+      ...prev,
+      customWeights: {
+        ...prev.customWeights,
+        [criteriaId]: parsedValue,
+      },
+      topsisResults: undefined,
+      topsisDetail: undefined,
+    }));
+  };
+
   const handleCalculateAhp = () => {
     if (!workspace.criteria.length) {
       setNotification("Tambahkan kriteria terlebih dahulu");
@@ -541,31 +591,47 @@ export default function Home() {
   };
 
   const handleCalculateTopsis = () => {
-    if (!workspace.ahpResult) {
-      setNotification("Hitung bobot AHP terlebih dahulu");
-      return;
-    }
-    if (!workspace.ahpResult.isConsistent && !ahpOverrideApproved) {
-      setNotification("Konfirmasi penggunaan bobot dengan CR > 0.1 terlebih dahulu");
-      return;
-    }
     if (!isScoreMatrixComplete(workspace)) {
       setNotification("Lengkapi matriks keputusan terlebih dahulu");
       return;
     }
+
+    let activeWeights: Record<string, number> = {};
+
+    if (workspace.weightingMode === "CUSTOM") {
+      const customReady = areCustomWeightsReady(workspace.criteria, workspace.customWeights);
+      if (!customReady) {
+        setNotification("Lengkapi bobot custom untuk semua kriteria (isi angka > 0)");
+        return;
+      }
+      activeWeights = sanitizeCustomWeights(workspace.criteria, workspace.customWeights);
+    } else {
+      if (!workspace.ahpResult) {
+        setNotification("Hitung bobot AHP terlebih dahulu");
+        return;
+      }
+      if (!workspace.ahpResult.isConsistent && !ahpOverrideApproved) {
+        setNotification("Konfirmasi penggunaan bobot dengan CR > 0.1 terlebih dahulu");
+        return;
+      }
+      activeWeights = workspace.ahpResult.weights;
+    }
+
     try {
       const { results, detail } = calculateTopsis(
         workspace.alternatives,
         workspace.criteria,
         workspace.scores,
-        workspace.ahpResult.weights,
+        activeWeights,
       );
       setWorkspace((prev) => ({
         ...prev,
         topsisResults: results,
         topsisDetail: detail,
       }));
-      setNotification("Perhitungan TOPSIS selesai");
+      setNotification(
+        `Perhitungan TOPSIS selesai (${workspace.weightingMode === "CUSTOM" ? "bobot custom" : "bobot AHP"})`,
+      );
     } catch (error) {
       if (error instanceof Error) setNotification(error.message);
     }
@@ -757,6 +823,10 @@ export default function Home() {
               activeTab={topsisTab}
               onTabChange={setTopsisTab}
               onCalculate={handleCalculateTopsis}
+              weightingMode={workspace.weightingMode}
+              customWeights={workspace.customWeights}
+              onWeightingModeChange={handleWeightingModeChange}
+              onCustomWeightChange={handleCustomWeightChange}
             />
           )}
 

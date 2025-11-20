@@ -34,9 +34,9 @@ export const DashboardView = ({ workspace, onNavigate }: DashboardViewProps) => 
     },
     {
       id: "ahp",
-      label: "Bobot AHP",
-      desc: "Perhitungan prioritas kriteria",
-      valid: status.ahpReady,
+      label: "Bobot (AHP/Custom)",
+      desc: "Pilih sumber bobot kriteria",
+      valid: status.weightingReady,
     },
     {
       id: "topsis",

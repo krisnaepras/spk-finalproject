@@ -23,6 +23,7 @@ export const ResultsView = ({ workspace }: ResultsViewProps) => {
   }
 
   const winner = workspace.alternatives.find((a) => a.id === results[0].alternativeId);
+  const weightingLabel = workspace.weightingMode === "CUSTOM" ? "bobot custom + TOPSIS" : "bobot AHP + TOPSIS";
 
   return (
     <div className="space-y-6">
@@ -30,7 +31,7 @@ export const ResultsView = ({ workspace }: ResultsViewProps) => {
         <CardHeader>
           <CardTitle className="text-primary">Rekomendasi Terbaik</CardTitle>
           <CardDescription>
-            Berdasarkan perhitungan AHP dan TOPSIS, alternatif terbaik adalah:
+            Berdasarkan {weightingLabel}, alternatif terbaik adalah:
           </CardDescription>
         </CardHeader>
         <CardContent>

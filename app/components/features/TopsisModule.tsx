@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/Card";
 import { Button } from "../ui/Button";
 import { Table, THead, TBody, Th, Td } from "../ui/Table";
+import { Input } from "../ui/Input";
 import { WorkspaceState, TopsisDetail, TopsisResult, Alternative, Criteria } from "@/lib/spk/types";
 
 type TopsisTab = "decision" | "normalized" | "weighted" | "ideal" | "distance" | "score";
@@ -10,6 +11,10 @@ interface TopsisModuleProps {
   activeTab: TopsisTab;
   onTabChange: (tab: TopsisTab) => void;
   onCalculate: () => void;
+  weightingMode: WorkspaceState["weightingMode"];
+  customWeights: WorkspaceState["customWeights"];
+  onWeightingModeChange: (mode: WorkspaceState["weightingMode"]) => void;
+  onCustomWeightChange: (criteriaId: string, value: string) => void;
 }
 
 export const TopsisModule = ({
@@ -17,6 +22,10 @@ export const TopsisModule = ({
   activeTab,
   onTabChange,
   onCalculate,
+  weightingMode,
+  customWeights,
+  onWeightingModeChange,
+  onCustomWeightChange,
 }: TopsisModuleProps) => {
   const tabs: { id: TopsisTab; label: string }[] = [
     { id: "decision", label: "Matriks Keputusan (X)" },
@@ -32,7 +41,8 @@ export const TopsisModule = ({
       return (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <p className="text-muted-foreground mb-4">
-            Hasil TOPSIS belum tersedia. Pastikan bobot AHP sudah dihitung dan matriks keputusan lengkap.
+            Hasil TOPSIS belum tersedia. Pastikan sumber bobot dipilih
+            ({weightingMode === "CUSTOM" ? "isi bobot custom" : "hitung bobot AHP"}) dan matriks keputusan lengkap.
           </p>
           <Button onClick={onCalculate}>Jalankan Perhitungan TOPSIS</Button>
         </div>
@@ -69,8 +79,87 @@ export const TopsisModule = ({
       <CardHeader>
         <CardTitle>Perhitungan TOPSIS</CardTitle>
         <CardDescription>
-          Detail langkah demi langkah metode TOPSIS.
+          Detail langkah demi langkah metode TOPSIS. Pilih skenario bobot sebelum menjalankan perhitungan.
         </CardDescription>
+        <div className="mt-4 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Skenario Bobot</p>
+              <p className="text-xs text-slate-600">
+                Pilih sumber bobot kriteria: hasil AHP atau isi manual (custom).
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={weightingMode === "AHP" ? "primary" : "outline"}
+                size="sm"
+                onClick={() => onWeightingModeChange("AHP")}
+              >
+                Pakai Bobot AHP
+              </Button>
+              <Button
+                variant={weightingMode === "CUSTOM" ? "primary" : "outline"}
+                size="sm"
+                onClick={() => onWeightingModeChange("CUSTOM")}
+              >
+                Bobot Custom
+              </Button>
+            </div>
+          </div>
+
+          {weightingMode === "AHP" ? (
+            <div className="rounded-lg border border-emerald-100 bg-white p-3 text-sm text-emerald-900">
+              {workspace.ahpResult ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <p className="font-semibold">Bobot AHP siap</p>
+                  <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                    CR: {workspace.ahpResult.cr.toFixed(4)}
+                  </span>
+                  {!workspace.ahpResult.isConsistent && (
+                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                      CR &gt; 0.1 (perlu konfirmasi)
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-emerald-900">
+                  Hitung dulu bobot AHP pada tab AHP. Bobot terbaru akan otomatis dipakai di TOPSIS.
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-slate-600">
+                Isi bobot custom per kriteria. Nilai akan dinormalisasi otomatis sebelum perhitungan TOPSIS.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {workspace.criteria.map((crit) => (
+                  <label key={crit.id} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-slate-900">
+                        {crit.code} – {crit.name}
+                      </span>
+                      <span className="text-[11px] uppercase tracking-wide text-slate-500">{crit.type}</span>
+                    </div>
+                    <Input
+                      className="mt-2"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={customWeights?.[crit.id] ?? ""}
+                      onChange={(e) => onCustomWeightChange(crit.id, e.target.value)}
+                      placeholder="contoh: 1.5"
+                    />
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-slate-600">
+                Tips: gunakan angka proporsional (mis. 3 berarti 3× lebih penting daripada bobot 1). Kami akan
+                normalisasi agar total = 1.
+              </p>
+            </div>
+          )}
+        </div>
         <div className="flex flex-wrap gap-2 mt-4">
           {tabs.map((tab) => (
             <Button

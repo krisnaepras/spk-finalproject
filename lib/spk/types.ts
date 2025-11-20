@@ -1,4 +1,5 @@
 export type CriteriaType = "BENEFIT" | "COST";
+export type WeightingMode = "AHP" | "CUSTOM";
 
 export interface Alternative {
   id: string;
@@ -83,6 +84,7 @@ export interface WorkflowStatus {
   criteriaReady: boolean;
   scoresReady: boolean;
   ahpReady: boolean;
+  weightingReady: boolean;
   topsisReady: boolean;
 }
 
@@ -93,6 +95,8 @@ export interface WorkspaceState {
   scores: Record<string, Record<string, number | null>>;
   pairwiseMatrix: AhpComparisonMatrix;
   ahpResult?: AhpResult;
+  weightingMode: WeightingMode;
+  customWeights: Record<string, number | null | undefined>;
   topsisResults?: TopsisResult[];
   topsisDetail?: TopsisDetail;
   lastImportSummary?: {
