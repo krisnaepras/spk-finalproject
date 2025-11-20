@@ -20,14 +20,14 @@ export const BackgroundAnimation = () => {
 
     // Configuration - Light Theme Edition
     const config = {
-      particleCount: 100, // Increased density
+      particleCount: 100,
       connectionDistance: 160,
       mouseDistance: 300,
       baseColor: "rgba(14, 165, 233, 0.7)",
       pulseColor: "rgba(6, 182, 212, 0.9)",
-      pulseSpeed: 3, // Faster data
-      pulseChance: 0.01, // More traffic
-      shootingStarChance: 0.005, // Occasional shooting star
+      pulseSpeed: 3,
+      pulseChance: 0.01,
+      shootingStarChance: 0.005,
     };
 
     class Particle {
@@ -48,14 +48,13 @@ export const BackgroundAnimation = () => {
         this.y = Math.random() * height;
         this.baseX = this.x;
         this.baseY = this.y;
-        this.vx = (Math.random() - 0.5) * 0.8; // Faster movement
+        this.vx = (Math.random() - 0.5) * 0.8;
         this.vy = (Math.random() - 0.5) * 0.8;
         this.size = Math.random() * 2.5 + 1;
         this.density = (Math.random() * 30) + 1;
         this.angle = Math.random() * 360;
         this.spinSpeed = Math.random() * 0.05 - 0.025;
         
-        // Soft Light Palette
         const colors = ["#0ea5e9", "#06b6d4", "#14b8a6", "#3b82f6", "#6366f1"];
         this.color = colors[Math.floor(Math.random() * colors.length)];
       }
@@ -65,11 +64,9 @@ export const BackgroundAnimation = () => {
         this.y += this.vy;
         this.angle += this.spinSpeed;
 
-        // Bounce off edges
         if (this.x < 0 || this.x > width) this.vx *= -1;
         if (this.y < 0 || this.y > height) this.vy *= -1;
 
-        // Mouse interaction
         const dx = mouse.x - this.x;
         const dy = mouse.y - this.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
@@ -81,17 +78,17 @@ export const BackgroundAnimation = () => {
           const directionX = forceDirectionX * force * this.density;
           const directionY = forceDirectionY * force * this.density;
           
-          this.x -= directionX * 0.8; // Stronger repulsion
+          this.x -= directionX * 0.8;
           this.y -= directionY * 0.8;
         } else {
-            if (this.x !== this.baseX) {
-                const dx = this.x - this.baseX;
-                this.x -= dx/40;
-            }
-             if (this.y !== this.baseY) {
-                const dy = this.y - this.baseY;
-                this.y -= dy/40;
-            }
+          if (this.x !== this.baseX) {
+            const dx = this.x - this.baseX;
+            this.x -= dx/40;
+          }
+          if (this.y !== this.baseY) {
+            const dy = this.y - this.baseY;
+            this.y -= dy/40;
+          }
         }
       }
 
@@ -101,7 +98,6 @@ export const BackgroundAnimation = () => {
         ctx.fillStyle = this.color;
         ctx.fill();
         
-        // Soft Glow
         ctx.shadowBlur = 10;
         ctx.shadowColor = this.color;
       }
@@ -166,7 +162,7 @@ export const BackgroundAnimation = () => {
         this.size = Math.random() * 1 + 0.1;
         this.waitTime = new Date().getTime() + Math.random() * 3000 + 500;
         this.active = false;
-        this.angle = -45; // Diagonal movement
+        this.angle = -45;
       }
 
       update(width: number, height: number) {
@@ -180,7 +176,7 @@ export const BackgroundAnimation = () => {
         } else {
           if (new Date().getTime() >= this.waitTime) {
             this.active = true;
-            this.x = Math.random() * width + 200; // Start slightly off screen
+            this.x = Math.random() * width + 200;
             this.y = -100;
           }
         }
@@ -196,7 +192,6 @@ export const BackgroundAnimation = () => {
         ctx.lineTo(this.x + this.len, this.y - this.len);
         ctx.stroke();
 
-        // Star head
         ctx.beginPath();
         ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
         ctx.fillStyle = "#0ea5e9";
@@ -215,9 +210,8 @@ export const BackgroundAnimation = () => {
       for (let i = 0; i < config.particleCount; i++) {
         particles.push(new Particle(canvas.width, canvas.height));
       }
-      // Add a few shooting stars
       for (let i = 0; i < 3; i++) {
-          shootingStars.push(new ShootingStar(canvas.width, canvas.height));
+        shootingStars.push(new ShootingStar(canvas.width, canvas.height));
       }
     };
 
@@ -228,17 +222,13 @@ export const BackgroundAnimation = () => {
 
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      // Reset shadow
       ctx.shadowBlur = 0;
 
-      // Update particles
       particles.forEach((particle) => {
         particle.update(canvas.width, canvas.height);
         particle.draw(ctx);
       });
 
-      // Draw connections
       particles.forEach((p1, i) => {
         for (let j = i + 1; j < particles.length; j++) {
           const p2 = particles[j];
@@ -262,27 +252,24 @@ export const BackgroundAnimation = () => {
         }
       });
 
-      // Pulses
       pulses = pulses.filter(p => !p.dead);
       pulses.forEach(pulse => {
         pulse.update();
         pulse.draw(ctx);
       });
 
-      // Shooting Stars
       shootingStars.forEach(star => {
-          star.update(canvas.width, canvas.height);
-          star.draw(ctx);
+        star.update(canvas.width, canvas.height);
+        star.draw(ctx);
       });
 
-      // Mouse Glow
       if (mouse.x > 0) {
-          const gradient = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 400);
-          gradient.addColorStop(0, "rgba(14, 165, 233, 0.08)"); // Sky blue glow
-          gradient.addColorStop(0.5, "rgba(6, 182, 212, 0.04)"); // Cyan fade
-          gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
-          ctx.fillStyle = gradient;
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const gradient = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 400);
+        gradient.addColorStop(0, "rgba(14, 165, 233, 0.08)");
+        gradient.addColorStop(0.5, "rgba(6, 182, 212, 0.04)");
+        gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
 
       animationFrameId = requestAnimationFrame(animate);
@@ -294,8 +281,8 @@ export const BackgroundAnimation = () => {
     };
     
     const handleMouseLeave = () => {
-        mouse.x = -1000;
-        mouse.y = -1000;
+      mouse.x = -1000;
+      mouse.y = -1000;
     }
 
     window.addEventListener("resize", resize);
