@@ -358,27 +358,44 @@ export default function Home() {
     setHasUnsavedChanges(true);
   };
 
-  const handleImportAlternatives = (importedData: Partial<Alternative>[]) => {
+  const handleImportAlternatives = (importedData: {
+    alternatives: Partial<Alternative>[];
+    criteria?: Criteria[];
+    scores?: WorkspaceState["scores"];
+  }) => {
     setWorkspace((prev) => {
-      const newAlternatives: Alternative[] = importedData.map((item, index) => ({
-        id: crypto.randomUUID(),
+      const newAlternatives: Alternative[] = importedData.alternatives.map((item, index) => ({
+        id: item.id || crypto.randomUUID(),
         code: item.code || `A${prev.alternatives.length + index + 1}`,
         name: item.name || `Alternatif ${prev.alternatives.length + index + 1}`,
         description: item.description || "",
       }));
 
       const combinedAlternatives = [...prev.alternatives, ...newAlternatives];
-      const syncedScores = syncScoresStructure(combinedAlternatives, prev.criteria, prev.scores);
+      
+      // If criteria are  imported, replace existing criteria
+      const criteriaToUse = importedData.criteria && importedData.criteria.length > 0
+        ? importedData.criteria
+        : prev.criteria;
+      
+      // Merge scores if provided
+      const scoresToUse = importedData.scores
+        ? { ...prev.scores, ...importedData.scores }
+        : syncScoresStructure(combinedAlternatives, prev.criteria, prev.scores);
 
       return {
         ...prev,
         alternatives: combinedAlternatives,
-        scores: syncedScores,
+        criteria: criteriaToUse,
+        scores: scoresToUse,
+        pairwiseMatrix: importedData.criteria ? sanitizePairwiseMatrix(criteriaToUse, {}) : prev.pairwiseMatrix,
+        ahpResult: importedData.criteria ? undefined : prev.ahpResult,
         topsisResults: undefined,
         topsisDetail: undefined,
       };
     });
-    setNotification(`${importedData.length} alternatif berhasil diimport`);
+    setIsImportOpen(false);
+    setNotification(`${importedData.alternatives.length} alternatif berhasil diimport`);
     setHasUnsavedChanges(true);
   };
 
