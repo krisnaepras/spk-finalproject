@@ -62,6 +62,12 @@ type WorkspaceHistoryItem = {
   workspace: WorkspaceState;
 };
 
+type AuthUser = {
+  id: string;
+  username: string;
+  name?: string | null;
+};
+
 const defaultAlternativeForm = (code: string): AlternativeForm => ({
   id: "",
   code,
@@ -83,6 +89,7 @@ export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authForm, setAuthForm] = useState({ username: "", password: "" });
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [history, setHistory] = useState<WorkspaceHistoryItem[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
@@ -122,6 +129,17 @@ export default function Home() {
     if (stored === "true") {
       setIsAuthenticated(true);
     }
+    const userRaw = window.localStorage.getItem("spk_user");
+    if (userRaw) {
+      try {
+        const parsed = JSON.parse(userRaw) as AuthUser;
+        if (parsed && parsed.id && parsed.username) {
+          setCurrentUser(parsed);
+        }
+      } catch {
+        // ignore parse error
+      }
+    }
     const historyRaw = window.localStorage.getItem("spk_history");
     if (historyRaw) {
       try {
@@ -140,6 +158,27 @@ export default function Home() {
     window.localStorage.setItem("spk_history", JSON.stringify(items));
   };
 
+  useEffect(() => {
+    if (!currentUser) return;
+    (async () => {
+      try {
+        const response = await fetch(
+          `/api/history?userId=${encodeURIComponent(currentUser.id)}`,
+        );
+        if (!response.ok) {
+          return;
+        }
+        const data = (await response.json()) as { items?: WorkspaceHistoryItem[] };
+        if (Array.isArray(data.items)) {
+          setHistory(data.items);
+          persistHistory(data.items);
+        }
+      } catch {
+        // abaikan kegagalan sync riwayat
+      }
+    })();
+  }, [currentUser]);
+
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setAuthError(null);
@@ -152,15 +191,25 @@ export default function Home() {
         body: JSON.stringify(authForm),
       });
 
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({ message: "Login gagal." }));
-        setAuthError(body.message || "Login gagal.");
+      const body = await response.json().catch(() => null);
+
+      if (!response.ok || !body) {
+        const message = body?.message || "Login gagal.";
+        setAuthError(message);
+        return;
+      }
+
+      const user = body.user as AuthUser | undefined;
+      if (!user || !user.id || !user.username) {
+        setAuthError("Respon login tidak valid.");
         return;
       }
 
       setIsAuthenticated(true);
+      setCurrentUser(user);
       if (typeof window !== "undefined") {
         window.localStorage.setItem("spk_auth", "true");
+        window.localStorage.setItem("spk_user", JSON.stringify(user));
       }
     } catch (error) {
       if (error instanceof Error) {
@@ -173,8 +222,12 @@ export default function Home() {
 
   const handleLogout = () => {
     setIsAuthenticated(false);
+    setCurrentUser(null);
+    setHistory([]);
     if (typeof window !== "undefined") {
       window.localStorage.removeItem("spk_auth");
+      window.localStorage.removeItem("spk_user");
+      window.localStorage.removeItem("spk_history");
     }
   };
 
@@ -204,6 +257,26 @@ export default function Home() {
       persistHistory(next);
       return next;
     });
+    if (currentUser) {
+      void (async () => {
+        try {
+          await fetch("/api/history", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              id: item.id,
+              userId: currentUser.id,
+              name,
+              workspace,
+            }),
+          });
+        } catch {
+          // abaikan kegagalan sync; tetap tersimpan lokal
+        }
+      })();
+    }
     setHasUnsavedChanges(false);
     setNotification(`Perhitungan "${name}" disimpan ke riwayat`);
   };
@@ -246,6 +319,21 @@ export default function Home() {
       setPendingDeleteHistoryId(null);
       setPendingDeleteHistoryName(null);
     }
+    if (currentUser) {
+      void (async () => {
+        try {
+          await fetch("/api/history", {
+            method: "DELETE",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ id, userId: currentUser.id }),
+          });
+        } catch {
+          // abaikan kegagalan sync
+        }
+      })();
+    }
   };
 
   const handleStartEditHistory = (item: WorkspaceHistoryItem) => {
@@ -274,6 +362,21 @@ export default function Home() {
     setEditingHistoryId(null);
     setEditingHistoryName("");
     setNotification(`Nama riwayat diperbarui menjadi "${name}"`);
+    if (currentUser) {
+      void (async () => {
+        try {
+          await fetch("/api/history", {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ id: editingHistoryId, userId: currentUser.id, name }),
+          });
+        } catch {
+          // abaikan kegagalan sync
+        }
+      })();
+    }
   };
 
   const handleAlternativeSubmit = (event: FormEvent<HTMLFormElement>) => {
