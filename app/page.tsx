@@ -29,12 +29,13 @@ import { Input } from "./components/ui/Input";
 // Feature Components
 import { DashboardView } from "./components/features/DashboardView";
 import { AlternativesManager } from "./components/features/AlternativesManager";
-import { ImportAlternatives } from "./components/features/ImportAlternatives";
+import dynamic from "next/dynamic";
 import { CriteriaManager } from "./components/features/CriteriaManager";
 import { ScoreMatrix } from "./components/features/ScoreMatrix";
 import { AhpModule } from "./components/features/AhpModule";
 import { TopsisModule } from "./components/features/TopsisModule";
 import { ResultsView } from "./components/features/ResultsView";
+import { Skeleton } from "./components/ui/Skeleton";
 
 type AlternativeForm = {
   id: string;
@@ -67,6 +68,24 @@ type AuthUser = {
   name?: string | null;
 };
 
+// Lazy load wizard import to keep initial bundle ringan
+const ImportAlternatives = dynamic(
+  () => import("./components/features/ImportAlternatives").then((m) => m.ImportAlternatives),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-xl border border-dashed border-muted-foreground/30 p-6 text-sm text-muted-foreground">
+        Memuat wizard import...
+        <div className="mt-3 space-y-2">
+          <Skeleton className="h-3 w-2/3" />
+          <Skeleton className="h-3 w-1/2" />
+          <Skeleton className="h-24 w-full" />
+        </div>
+      </div>
+    ),
+  },
+);
+
 const defaultAlternativeForm = (code: string): AlternativeForm => ({
   id: "",
   code,
@@ -91,7 +110,7 @@ export default function Home() {
   const [authForm, setAuthForm] = useState({ username: "", password: "" });
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [history, setHistory] = useState<WorkspaceHistoryItem[]>([]);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  // removed unsaved flag (tidak dipakai di UI)
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [historyNameInput, setHistoryNameInput] = useState("");
   const [isNewCalcConfirmOpen, setIsNewCalcConfirmOpen] = useState(false);
@@ -121,6 +140,7 @@ export default function Home() {
     if (typeof window === "undefined") return;
     const stored = window.localStorage.getItem("spk_auth");
     if (stored === "true") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsAuthenticated(true);
     }
     const userRaw = window.localStorage.getItem("spk_user");
@@ -147,6 +167,11 @@ export default function Home() {
     }
   }, []);
 
+  const persistHistory = (items: WorkspaceHistoryItem[]) => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("spk_history", JSON.stringify(items));
+  };
+
   useEffect(() => {
     if (!currentUser) return;
     (async () => {
@@ -167,10 +192,6 @@ export default function Home() {
   }, [currentUser]);
 
   // --- Helpers ---
-  const persistHistory = (items: WorkspaceHistoryItem[]) => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem("spk_history", JSON.stringify(items));
-  };
 
   const resetAlternativeForm = () => setAlternativeForm(defaultAlternativeForm(""));
   const resetCriteriaForm = () => setCriteriaForm(defaultCriteriaForm(""));
@@ -258,7 +279,6 @@ export default function Home() {
         }
       })();
     }
-    setHasUnsavedChanges(false);
     setNotification(`Perhitungan "${name}" disimpan ke riwayat`);
   };
 
@@ -281,7 +301,6 @@ export default function Home() {
     setMainTab("dashboard");
     setIsImportOpen(false);
     setNotification(`Perhitungan "${item.name}" dimuat dari riwayat`);
-    setHasUnsavedChanges(false);
     setIsHistoryListOpen(false);
   };
 
@@ -340,7 +359,6 @@ export default function Home() {
 
     resetAlternativeForm();
     setNotification(editing ? "Alternatif diperbarui" : "Alternatif ditambahkan");
-    setHasUnsavedChanges(true);
   };
 
   const handleAlternativeDelete = (id: string) => {
@@ -355,7 +373,6 @@ export default function Home() {
         topsisDetail: undefined,
       };
     });
-    setHasUnsavedChanges(true);
   };
 
   const handleImportAlternatives = (importedData: {
@@ -399,7 +416,6 @@ export default function Home() {
     });
     setIsImportOpen(false);
     setNotification(`${importedData.alternatives.length} alternatif berhasil diimport`);
-    setHasUnsavedChanges(true);
   };
 
   const handleCriteriaSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -452,7 +468,6 @@ export default function Home() {
     resetCriteriaForm();
     setNotification(editing ? "Kriteria diperbarui" : "Kriteria ditambahkan");
     setAhpOverrideApproved(false);
-    setHasUnsavedChanges(true);
   };
 
   const handleCriteriaDelete = (id: string) => {
@@ -473,7 +488,6 @@ export default function Home() {
       };
     });
     setAhpOverrideApproved(false);
-    setHasUnsavedChanges(true);
   };
 
   const handleScoreChange = (alternativeId: string, criteriaId: string, value: string) => {
@@ -490,7 +504,6 @@ export default function Home() {
       topsisResults: undefined,
       topsisDetail: undefined,
     }));
-    setHasUnsavedChanges(true);
   };
 
   const handlePairwiseChange = (rowId: string, colId: string, value: number) => {
@@ -503,7 +516,6 @@ export default function Home() {
       topsisDetail: undefined,
     }));
     setAhpOverrideApproved(false);
-    setHasUnsavedChanges(true);
   };
 
   const handleCalculateAhp = () => {
@@ -523,7 +535,6 @@ export default function Home() {
       }));
       setAhpOverrideApproved(result.isConsistent);
       setNotification("Bobot kriteria berhasil dihitung");
-      setHasUnsavedChanges(true);
     } catch (error) {
       if (error instanceof Error) setNotification(error.message);
     }
@@ -555,7 +566,6 @@ export default function Home() {
         topsisDetail: detail,
       }));
       setNotification("Perhitungan TOPSIS selesai");
-      setHasUnsavedChanges(true);
     } catch (error) {
       if (error instanceof Error) setNotification(error.message);
     }

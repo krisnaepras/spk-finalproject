@@ -73,8 +73,19 @@ const parseGemini = (text: string): Recommendation[] => {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const criteria: CriteriaInput[] = Array.isArray(body?.criteria) ? body.criteria : [];
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Payload harus JSON valid." },
+        { status: 400 },
+      );
+    }
+
+    const payload = body as { criteria?: unknown };
+    const rawCriteria = payload?.criteria;
+    const criteria: CriteriaInput[] = Array.isArray(rawCriteria) ? (rawCriteria as CriteriaInput[]) : [];
 
     if (!criteria.length) {
       return NextResponse.json(
@@ -90,7 +101,7 @@ export async function POST(req: Request) {
     if (hasApiKey) {
       try {
         const aiText = await generateGeminiText(promptText(criteria));
-        const parsed = parseGemini(aiText);
+        const parsed = parseGemini(aiText || "");
         if (parsed.length) {
           recommendations = parsed;
           note = "Rekomendasi AI dari Gemini (bisa diedit sebelum diterapkan).";

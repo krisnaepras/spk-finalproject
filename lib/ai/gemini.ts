@@ -17,7 +17,7 @@ export async function runGeminiSample() {
     model: DEFAULT_MODEL,
     contents: "Explain how AI works in a few words",
   });
-  return response.text;
+  return response.text ?? "";
 }
 
 /**
@@ -28,5 +28,5 @@ export async function generateGeminiText(prompt: string, model: string = DEFAULT
     model,
     contents: prompt,
   });
-  return response.text;
+  return response.text ?? "";
 }
