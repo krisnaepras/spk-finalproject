@@ -182,14 +182,17 @@ export default function Home() {
         const response = await fetch(
           `/api/history?userId=${encodeURIComponent(currentUser.id)}`,
         );
-        if (!response.ok) return;
+        if (!response.ok) {
+          setNotification("Gagal memuat riwayat dari server. Pastikan koneksi/database siap.");
+          return;
+        }
         const data = (await response.json()) as { items?: WorkspaceHistoryItem[] };
         if (Array.isArray(data.items)) {
           setHistory(data.items);
           persistHistory(data.items);
         }
       } catch {
-        // ignore
+        setNotification("Gagal memuat riwayat dari server. Pastikan koneksi/database siap.");
       }
     })();
   }, [currentUser]);
@@ -283,17 +286,23 @@ export default function Home() {
     if (currentUser) {
       void (async () => {
         try {
-          await fetch("/api/history", {
+          const resp = await fetch("/api/history", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ id: item.id, userId: currentUser.id, name, workspace }),
           });
+          if (!resp.ok) {
+            setNotification("Riwayat gagal disimpan ke server. Cek koneksi/database.");
+          } else {
+            setNotification(`Perhitungan "${name}" disimpan ke riwayat (server & lokal)`);
+          }
         } catch {
-          // ignore
+          setNotification("Riwayat gagal disimpan ke server. Cek koneksi/database.");
         }
       })();
+    } else {
+      setNotification(`Perhitungan "${name}" disimpan di perangkat ini (belum login).`);
     }
-    setNotification(`Perhitungan "${name}" disimpan ke riwayat`);
   };
 
   const handleSaveHistorySubmit = (event: FormEvent<HTMLFormElement>) => {

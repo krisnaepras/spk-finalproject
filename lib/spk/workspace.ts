@@ -112,9 +112,9 @@ export function isScoreMatrixComplete(state: WorkspaceState): boolean {
 export function sanitizeCustomWeights(
   criteria: Criteria[],
   customWeights: WorkspaceState["customWeights"],
-): WorkspaceState["customWeights"] {
+): Record<string, number> {
   const ids = new Set(criteria.map((item) => item.id));
-  const sanitized: WorkspaceState["customWeights"] = {};
+  const sanitized: Record<string, number> = {};
 
   Object.entries(customWeights ?? {}).forEach(([criteriaId, value]) => {
     if (!ids.has(criteriaId)) return;
