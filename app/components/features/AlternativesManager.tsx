@@ -17,7 +17,6 @@ interface AlternativesManagerProps {
   onSubmit: (e: FormEvent<HTMLFormElement>) => void;
   onDelete: (id: string) => void;
   onReset: () => void;
-  onImport: () => void;
 }
 
 export const AlternativesManager = ({
@@ -27,7 +26,6 @@ export const AlternativesManager = ({
   onSubmit,
   onDelete,
   onReset,
-  onImport,
 }: AlternativesManagerProps) => {
   const isEditing = Boolean(form.id);
 
@@ -87,16 +85,11 @@ export const AlternativesManager = ({
       </Card>
 
       <Card className="lg:col-span-2">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Daftar Alternatif</CardTitle>
-            <CardDescription>
-              Total: {alternatives.length} alternatif terdaftar
-            </CardDescription>
-          </div>
-          <Button variant="outline" size="sm" onClick={onImport}>
-            Import Data
-          </Button>
+        <CardHeader>
+          <CardTitle>Daftar Alternatif</CardTitle>
+          <CardDescription>
+            Total: {alternatives.length} alternatif terdaftar
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">

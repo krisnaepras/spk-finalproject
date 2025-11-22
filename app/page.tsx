@@ -122,7 +122,6 @@ export default function Home() {
     defaultAlternativeForm("A1"),
   );
   const [criteriaForm, setCriteriaForm] = useState<CriteriaForm>(() => defaultCriteriaForm("C1"));
-  const [isImportOpen, setIsImportOpen] = useState(false);
   const [topsisTab, setTopsisTab] = useState<TopsisTab>("decision");
   const [ahpOverrideApproved, setAhpOverrideApproved] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
@@ -265,7 +264,6 @@ export default function Home() {
     setNotification(null);
     setTopsisTab("decision");
     setMainTab("dashboard");
-    setIsImportOpen(false);
     setIsNewCalcConfirmOpen(false);
   };
 
@@ -328,7 +326,6 @@ export default function Home() {
     setAhpOverrideApproved(false);
     setTopsisTab("decision");
     setMainTab("dashboard");
-    setIsImportOpen(false);
     setNotification(`Perhitungan "${item.name}" dimuat dari riwayat`);
     setIsHistoryListOpen(false);
   };
@@ -777,22 +774,18 @@ export default function Home() {
           )}
 
           {mainTab === "alternatives" && (
-            <AlternativesManager
-              alternatives={workspace.alternatives}
-              form={alternativeForm}
-              onFormChange={setAlternativeForm}
-              onSubmit={handleAlternativeSubmit}
-              onDelete={handleAlternativeDelete}
-              onReset={resetAlternativeForm}
-              onImport={() => setIsImportOpen(true)}
-            />
+            <>
+              <AlternativesManager
+                alternatives={workspace.alternatives}
+                form={alternativeForm}
+                onFormChange={setAlternativeForm}
+                onSubmit={handleAlternativeSubmit}
+                onDelete={handleAlternativeDelete}
+                onReset={resetAlternativeForm}
+              />
+              <ImportAlternatives inline onImport={handleImportAlternatives} />
+            </>
           )}
-
-          <ImportAlternatives
-            isOpen={isImportOpen}
-            onClose={() => setIsImportOpen(false)}
-            onImport={handleImportAlternatives}
-          />
 
           {mainTab === "criteria" && (
             <CriteriaManager
