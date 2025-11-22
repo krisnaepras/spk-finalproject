@@ -592,7 +592,7 @@ export default function Home() {
           weight: result.weights[item.id] ?? item.weight,
         })),
       }));
-      setAhpOverrideApproved(result.isConsistent);
+      setAhpOverrideApproved(result.isConsistent || ahpOverrideApproved);
       setNotification("Bobot kriteria berhasil dihitung");
     } catch (error) {
       if (error instanceof Error) setNotification(error.message);

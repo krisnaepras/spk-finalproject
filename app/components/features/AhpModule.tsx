@@ -5,8 +5,9 @@ import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { Table, THead, TBody, Th, Td } from "../ui/Table";
 import { Criteria, WorkspaceState } from "@/lib/spk/types";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Modal } from "../ui/Modal";
+import { calculateAhpResult } from "@/lib/spk/ahp";
 
 interface AhpModuleProps {
   criteria: Criteria[];
@@ -40,6 +41,23 @@ export const AhpModule = ({
   const [aiError, setAiError] = useState<string>("");
   const [isAiPromptOpen, setIsAiPromptOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("Berikan saran perbandingan yang logis.");
+
+  const liveAhp = useMemo(() => {
+    if (criteria.length < 2) return null;
+    try {
+      return calculateAhpResult(criteria, pairwiseMatrix);
+    } catch {
+      return null;
+    }
+  }, [criteria, pairwiseMatrix]);
+
+  const handleSave = () => {
+    if (!liveAhp) return;
+    if (!liveAhp.isConsistent && !isOverrideApproved) {
+      onConfirmInconsistent();
+    }
+    onCalculate();
+  };
 
   const percentFormatter = new Intl.NumberFormat("id-ID", {
     style: "percent",
@@ -132,7 +150,8 @@ export const AhpModule = ({
         <CardHeader>
           <CardTitle>Matriks Perbandingan Berpasangan</CardTitle>
           <CardDescription>
-            Isi nilai perbandingan antar kriteria (skala 1-9).
+            Isi nilai perbandingan antar kriteria (skala 1-9). Panel kanan menampilkan bobot &amp; CR yang
+            berubah otomatis saat matriks diubah.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -141,211 +160,211 @@ export const AhpModule = ({
               Minimal perlukan 2 kriteria untuk melakukan perbandingan.
             </div>
           ) : (
-            <>
-              {/* AI Recommendation Button */}
-              <div className="mb-4 flex justify-end">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsAiPromptOpen(true)}
-                  disabled={isLoadingAi}
-                >
-                  {isLoadingAi ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Memuat...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                      </svg>
-                      Rekomendasi AI
-                    </>
-                  )}
-                </Button>
-              </div>
-
-              {/* AI Error */}
-              {aiError && (
-                <div className="mb-4 rounded-lg border border-rose-300 bg-rose-50 p-4 text-rose-700">
-                  <p className="text-sm font-semibold">⚠️ {aiError}</p>
-                  <p className="text-xs mt-1">
-                    Pastikan GEMINI_API_KEY sudah ditambahkan di file .env.local
-                  </p>
+            <div className="grid gap-6 lg:grid-cols-[1.6fr_0.9fr]">
+              <div className="space-y-4">
+                {/* AI Recommendation Button */}
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsAiPromptOpen(true)}
+                    disabled={isLoadingAi}
+                  >
+                    {isLoadingAi ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Memuat...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                        </svg>
+                        Rekomendasi AI
+                      </>
+                    )}
+                  </Button>
                 </div>
-              )}
 
-              {/* AI Recommendations Display */}
-              {aiRecommendations && aiRecommendations.length > 0 && (
-                <div className="mb-4 rounded-lg border border-cyan-200 bg-cyan-50 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold text-cyan-900">✨ Rekomendasi AI</h4>
-                    <Button variant="primary" size="sm" onClick={applyAllRecommendations}>
-                      Terapkan Semua
-                    </Button>
+                {/* AI Error */}
+                {aiError && (
+                  <div className="rounded-lg border border-rose-300 bg-rose-50 p-4 text-rose-700">
+                    <p className="text-sm font-semibold">⚠️ {aiError}</p>
+                    <p className="text-xs mt-1">
+                      Pastikan GEMINI_API_KEY sudah ditambahkan di file .env.local
+                    </p>
                   </div>
-                  
-                  {aiNote && (
-                    <p className="text-sm text-cyan-700 mb-3 italic">{aiNote}</p>
-                  )}
-                  
-                  <div className="space-y-2">
-                    {aiRecommendations.map((rec, idx) => (
-                      <div key={idx} className="flex items-start justify-between bg-white rounded-md p-3 text-sm">
-                        <div className="flex-1">
-                          <p className="font-semibold text-foreground">
-                            {rec.row} vs {rec.col}: <span className="text-primary">{rec.value}</span>
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">{rec.reason}</p>
+                )}
+
+                {/* AI Recommendations Display */}
+                {aiRecommendations && aiRecommendations.length > 0 && (
+                  <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-semibold text-cyan-900">✨ Rekomendasi AI</h4>
+                      <Button variant="primary" size="sm" onClick={applyAllRecommendations}>
+                        Terapkan Semua
+                      </Button>
+                    </div>
+                    
+                    {aiNote && (
+                      <p className="text-sm text-cyan-700 mb-3 italic">{aiNote}</p>
+                    )}
+                    
+                    <div className="space-y-2">
+                      {aiRecommendations.map((rec, idx) => (
+                        <div key={idx} className="flex items-start justify-between bg-white rounded-md p-3 text-sm">
+                          <div className="flex-1">
+                            <p className="font-semibold text-foreground">
+                              {rec.row} vs {rec.col}: <span className="text-primary">{rec.value}</span>
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">{rec.reason}</p>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => applyRecommendation(rec)}
+                            className="ml-2"
+                          >
+                            Terapkan
+                          </Button>
                         </div>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => applyRecommendation(rec)}
-                          className="ml-2"
-                        >
-                          Terapkan
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
-                <Table>
-                  <THead>
-                    <tr>
-                      <Th>Kriteria</Th>
-                      {criteria.map((c) => (
-                        <Th key={c.id} className="min-w-[100px]">
-                          {c.code}
-                        </Th>
                       ))}
-                    </tr>
-                  </THead>
-                  <TBody>
-                    {criteria.map((row, i) => (
-                      <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
-                        <Td className="font-medium">
-                          {row.name} ({row.code})
-                        </Td>
-                        {criteria.map((col, j) => {
-                          const isDiagonal = i === j;
-                          const isLowerTriangle = i > j;
-                          const value =
-                            pairwiseMatrix[row.id]?.[col.id] ?? (isDiagonal ? 1 : 0);
+                    </div>
+                  </div>
+                )}
 
-                          return (
-                            <Td key={col.id} className="p-2">
-                              <Input
-                                type="number"
-                                min="0.1"
-                                max="9"
-                                step="any"
-                                disabled={isDiagonal || isLowerTriangle}
-                                className={isDiagonal ? "bg-slate-100 text-muted-foreground" : ""}
-                                value={value}
-                                onChange={(e) =>
-                                  onPairwiseChange(row.id, col.id, parseFloat(e.target.value))
-                                }
-                              />
-                            </Td>
-                          );
-                        })}
+                <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+                  <Table>
+                    <THead>
+                      <tr>
+                        <Th>Kriteria</Th>
+                        {criteria.map((c) => (
+                          <Th key={c.id} className="min-w-[100px]">
+                            {c.code}
+                          </Th>
+                        ))}
                       </tr>
-                    ))}
-                  </TBody>
-                </Table>
+                    </THead>
+                    <TBody>
+                      {criteria.map((row, i) => (
+                        <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+                          <Td className="font-medium">
+                            {row.name} ({row.code})
+                          </Td>
+                          {criteria.map((col, j) => {
+                            const isDiagonal = i === j;
+                            const isLowerTriangle = i > j;
+                            const value =
+                              pairwiseMatrix[row.id]?.[col.id] ?? (isDiagonal ? 1 : 0);
+
+                            return (
+                              <Td key={col.id} className="p-2">
+                                <Input
+                                  type="number"
+                                  min="0.1"
+                                  max="9"
+                                  step="any"
+                                  disabled={isDiagonal || isLowerTriangle}
+                                  className={isDiagonal ? "bg-slate-100 text-muted-foreground" : ""}
+                                  value={value}
+                                  onFocus={(e) => e.target.select()}
+                                  onChange={(e) => {
+                                    const parsed = parseFloat(e.target.value);
+                                    if (Number.isNaN(parsed)) return;
+                                    onPairwiseChange(row.id, col.id, parsed);
+                                  }}
+                                />
+                              </Td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </TBody>
+                  </Table>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button onClick={handleSave} disabled={criteria.length < 2 || !liveAhp}>
+                    {liveAhp && !liveAhp.isConsistent ? "Konfirmasi & Simpan Bobot (CR>0.1)" : "Simpan Bobot AHP"}
+                  </Button>
+                </div>
               </div>
-            </>
+
+              <div className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-900">Bobot Live</p>
+                    <p className="text-xs text-emerald-800">Update otomatis saat matriks diubah.</p>
+                  </div>
+                  <span className="text-[11px] rounded-full bg-white px-3 py-1 text-emerald-700 font-semibold uppercase tracking-wide">
+                    Preview
+                  </span>
+                </div>
+                {liveAhp ? (
+                  <>
+                    <div className="grid grid-cols-3 gap-2 text-xs text-emerald-800">
+                      <div className="rounded-md bg-white/80 p-2">
+                        <p className="text-[11px] uppercase tracking-wide text-emerald-600">λmax</p>
+                        <p className="font-semibold text-emerald-900">{liveAhp.lambdaMax.toFixed(4)}</p>
+                      </div>
+                      <div className="rounded-md bg-white/80 p-2">
+                        <p className="text-[11px] uppercase tracking-wide text-emerald-600">CI</p>
+                        <p className="font-semibold text-emerald-900">{liveAhp.ci.toFixed(4)}</p>
+                      </div>
+                      <div className="rounded-md bg-white/80 p-2">
+                        <p className="text-[11px] uppercase tracking-wide text-emerald-600">CR</p>
+                        <p className={`font-semibold ${liveAhp.isConsistent ? "text-emerald-700" : "text-rose-700"}`}>
+                          {liveAhp.cr.toFixed(4)} {liveAhp.isConsistent ? "✓" : "✗"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 text-sm">
+                      {criteria.map((c) => {
+                        const weight = liveAhp.weights[c.id] ?? 0;
+                        const percent = percentFormatter.format(weight);
+                        return (
+                          <div key={c.id} className="rounded-md bg-white/80 px-3 py-2">
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium text-emerald-900">
+                                {c.code} — {c.name}
+                              </span>
+                              <span className="font-mono text-emerald-800">{percent}</span>
+                            </div>
+                            <div className="mt-2 h-2 w-full rounded-full bg-emerald-100">
+                              <div
+                                className="h-2 rounded-full bg-emerald-500 transition-all"
+                                style={{ width: `${Math.min(weight * 100, 100)}%` }}
+                                aria-label={`Bobot ${percent}`}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {!liveAhp.isConsistent && (
+                      <div className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-rose-700">
+                        <p className="text-sm font-semibold">Nilai CR &gt; 0.1 (Tidak Konsisten)</p>
+                        <p className="text-xs mt-1">
+                          Disarankan meninjau kembali matriks. Jika tetap ingin menggunakan bobot ini, klik tombol
+                          simpan di kiri (tombol akan otomatis melakukan konfirmasi).
+                        </p>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-emerald-800">
+                    Isi matriks di sebelah kiri untuk melihat bobot live.
+                  </p>
+                )}
+              </div>
+            </div>
           )}
-          <div className="mt-4 flex justify-end">
-            <Button onClick={onCalculate} disabled={criteria.length < 2}>
-              Hitung Bobot AHP
-            </Button>
-          </div>
         </CardContent>
       </Card>
-
-      {ahpResult && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Hasil Perhitungan AHP</CardTitle>
-            <CardDescription>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
-                <div className="flex flex-col">
-                  <span className="text-xs text-muted-foreground">Lambda Max (λmax)</span>
-                  <span className="font-bold text-foreground">
-                    {ahpResult.lambdaMax.toFixed(4)}
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-xs text-muted-foreground">Consistency Index (CI)</span>
-                  <span className="font-bold text-foreground">
-                    {ahpResult.ci.toFixed(4)}
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-xs text-muted-foreground">Consistency Ratio (CR)</span>
-                  <span
-                    className={`font-bold ${
-                      ahpResult.isConsistent ? "text-emerald-600" : "text-rose-600"
-                    }`}
-                  >
-                    {ahpResult.cr.toFixed(4)} {ahpResult.isConsistent ? "✓" : "✗"}
-                  </span>
-                </div>
-              </div>
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!ahpResult.isConsistent && !isOverrideApproved && (
-              <div className="mb-4 rounded-lg border border-rose-300 bg-rose-50 p-4 text-rose-700">
-                <p className="mb-2 font-semibold">Nilai CR {"> "} 0.1 (Tidak Konsisten)</p>
-                <p className="text-sm mb-3">
-                  Disarankan untuk meninjau kembali matriks perbandingan. Jika Anda yakin, Anda dapat
-                  melanjutkan dengan bobot ini.
-                </p>
-                <Button variant="destructive" size="sm" onClick={onConfirmInconsistent}>
-                  Gunakan Bobot Ini
-                </Button>
-              </div>
-            )}
-
-            <div className="rounded-md border">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-slate-50 text-muted-foreground">
-                  <tr>
-                    <th className="h-12 px-4 align-middle font-medium">Kode</th>
-                    <th className="h-12 px-4 align-middle font-medium">Kriteria</th>
-                    <th className="h-12 px-4 align-middle font-medium">Bobot Prioritas</th>
-                    <th className="h-12 px-4 align-middle font-medium">Persentase</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {criteria.map((c) => (
-                    <tr key={c.id} className="border-t border-slate-200 hover:bg-slate-50 transition-colors">
-                      <td className="p-4 font-medium">{c.code}</td>
-                      <td className="p-4">{c.name}</td>
-                      <td className="p-4 font-mono">
-                        {(ahpResult.weights[c.id] ?? 0).toFixed(4)}
-                      </td>
-                      <td className="p-4 font-semibold text-primary">
-                        {percentFormatter.format(ahpResult.weights[c.id] ?? 0)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 };
