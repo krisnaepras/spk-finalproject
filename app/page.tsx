@@ -442,7 +442,6 @@ export default function Home() {
         topsisDetail: undefined,
       };
     });
-    setIsImportOpen(false);
     setNotification(`${importedData.alternatives.length} alternatif berhasil diimport`);
   };
 
