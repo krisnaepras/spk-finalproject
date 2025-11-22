@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import Papa from "papaparse";
+import * as XLSX from "xlsx";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
 import { MAX_CRITERIA } from "@/lib/spk/constants";
@@ -88,6 +90,23 @@ export const ImportAlternatives = ({ isOpen = false, inline = false, onClose, on
   const [step, setStep] = useState<ImportStep>("format");
   const [format, setFormat] = useState<ImportFormat>("json");
   const [jsonText, setJsonText] = useState("");
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState("");
+  const [excelWorkbook, setExcelWorkbook] = useState<XLSX.WorkBook | null>(null);
+  const [excelSheets, setExcelSheets] = useState<string[]>([]);
+  const [selectedSheet, setSelectedSheet] = useState<string>("");
+  const [isParsing, setIsParsing] = useState(false);
+  const [sqlConfig, setSqlConfig] = useState({
+    dbType: "postgres" as "postgres" | "mysql",
+    host: "",
+    port: "",
+    database: "",
+    username: "",
+    password: "",
+    query: "SELECT * FROM your_table LIMIT 50",
+  });
+  const [isSqlPreviewing, setIsSqlPreviewing] = useState(false);
+  const [sqlRowCount, setSqlRowCount] = useState<number | null>(null);
   const [rawData, setRawData] = useState<RawRecord[]>([]);
   const [availableFields, setAvailableFields] = useState<string[]>([]);
   const [fieldMapping, setFieldMapping] = useState({ codeField: "", nameField: "", descField: "" });
@@ -105,18 +124,50 @@ export const ImportAlternatives = ({ isOpen = false, inline = false, onClose, on
   const selectedCriteriaCount = selectedCriteriaEntries.length;
   const criteriaLimitReached = selectedCriteriaCount >= MAX_CRITERIA;
   const mappingReady = Boolean(fieldMapping.codeField);
-  const canParse = format === "json" && Boolean(jsonText.trim());
+  const canParse = useMemo(() => {
+    if (format === "json") return Boolean(jsonText.trim());
+    if (format === "excel") return Boolean(uploadedFile);
+    if (format === "sql")
+      return Boolean(
+        sqlConfig.host.trim() &&
+          sqlConfig.database.trim() &&
+          sqlConfig.username.trim() &&
+          sqlConfig.query.trim(),
+      );
+    return false;
+  }, [format, jsonText, uploadedFile, sqlConfig]);
+
+  const resetParsedData = () => {
+    setRawData([]);
+    setAvailableFields([]);
+    setFieldMapping({ codeField: "", nameField: "", descField: "" });
+    setCriteriaSelections({});
+    setSummary(null);
+    setError(null);
+  };
 
   const resetWizard = () => {
     setStep("format");
     setFormat("json");
     setJsonText("");
-    setRawData([]);
-    setAvailableFields([]);
-    setFieldMapping({ codeField: "", nameField: "", descField: "" });
-    setCriteriaSelections({});
-    setError(null);
-    setSummary(null);
+    setUploadedFile(null);
+    setUploadedFileName("");
+    setExcelWorkbook(null);
+    setExcelSheets([]);
+    setSelectedSheet("");
+    setIsParsing(false);
+    setSqlConfig({
+      dbType: "postgres",
+      host: "",
+      port: "",
+      database: "",
+      username: "",
+      password: "",
+      query: "SELECT * FROM your_table LIMIT 50",
+    });
+    setIsSqlPreviewing(false);
+    setSqlRowCount(null);
+    resetParsedData();
   };
 
   const handleClose = () => {
@@ -124,8 +175,25 @@ export const ImportAlternatives = ({ isOpen = false, inline = false, onClose, on
     onClose?.();
   };
 
+  const handleFormatSelect = (nextFormat: ImportFormat) => {
+    setFormat(nextFormat);
+    setUploadedFile(null);
+    setUploadedFileName("");
+    setExcelWorkbook(null);
+    setExcelSheets([]);
+    setSelectedSheet("");
+    if (nextFormat !== "json") {
+      setJsonText("");
+    }
+    setSqlRowCount(null);
+    resetParsedData();
+  };
+
   const detectFields = (data: RawRecord[]) => {
     const fields = Object.keys(data[0] || {});
+    if (!fields.length) {
+      throw new Error("Tidak ada kolom yang terbaca pada data sumber.");
+    }
 
     const codeField =
       fields.find(
@@ -166,40 +234,179 @@ export const ImportAlternatives = ({ isOpen = false, inline = false, onClose, on
     return { fields, codeField, nameField, descField, criteria };
   };
 
-  const handleParseData = () => {
-    try {
-      if (format !== "json") {
-        setError("Saat ini import otomatis mendukung JSON. Pilih JSON untuk melanjutkan.");
-        return;
-      }
+  const processParsedData = (data: RawRecord[]) => {
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new Error("Data kosong atau tidak terbaca.");
+    }
+    const detection = detectFields(data);
+    setRawData(data);
+    setAvailableFields(detection.fields);
+    setFieldMapping({
+      codeField: detection.codeField,
+      nameField: detection.nameField,
+      descField: detection.descField,
+    });
+    setCriteriaSelections(detection.criteria);
+    setSummary(null);
+    setStep("mapping");
+  };
 
-      setError(null);
-      const parsed = JSON.parse(jsonText) as unknown;
-
-      if (!Array.isArray(parsed)) {
-        throw new Error("Format JSON harus berupa array of objects.");
-      }
-      if (parsed.length === 0) {
-        throw new Error("Array JSON kosong.");
-      }
-
-      const json = parsed as RawRecord[];
-      setRawData(json);
-
-      const detection = detectFields(json);
-      setAvailableFields(detection.fields);
-      setFieldMapping({
-        codeField: detection.codeField,
-        nameField: detection.nameField,
-        descField: detection.descField,
+  const parseCsvFile = (file: File): Promise<RawRecord[]> =>
+    new Promise((resolve, reject) => {
+      Papa.parse<RawRecord>(file, {
+        header: true,
+        dynamicTyping: true,
+        skipEmptyLines: true,
+        complete: (result) => {
+          if (result.errors && result.errors.length > 0) {
+            reject(new Error(result.errors[0]?.message || "Gagal membaca file CSV."));
+            return;
+          }
+          const data = (result.data as RawRecord[]).filter((row) =>
+            Object.values(row).some((value) => value !== null && value !== undefined && value !== ""),
+          );
+          resolve(data);
+        },
+        error: (err) => reject(err),
       });
-      setCriteriaSelections(detection.criteria);
-      setStep("mapping");
+    });
+
+  const parseExcelWorkbook = async (file: File, sheetName?: string) => {
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: "array" });
+    const sheets = workbook.SheetNames;
+    if (!sheets.length) {
+      throw new Error("File tidak memiliki sheet.");
+    }
+    const activeSheet = sheetName && sheets.includes(sheetName) ? sheetName : sheets[0];
+    const worksheet = workbook.Sheets[activeSheet];
+    if (!worksheet) {
+      throw new Error("Sheet tidak ditemukan.");
+    }
+    const rows = XLSX.utils.sheet_to_json<RawRecord>(worksheet, { defval: null }) as RawRecord[];
+    return { workbook, sheets, sheetName: activeSheet, rows };
+  };
+
+  const handleSheetChange = (sheetName: string) => {
+    if (!excelWorkbook) return;
+    try {
+      const worksheet = excelWorkbook.Sheets[sheetName];
+      if (!worksheet) {
+        throw new Error("Sheet tidak ditemukan.");
+      }
+      const rows = XLSX.utils.sheet_to_json<RawRecord>(worksheet, { defval: null }) as RawRecord[];
+      setSelectedSheet(sheetName);
+      processParsedData(rows);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Format JSON tidak valid");
+      setError(err instanceof Error ? err.message : "Gagal memproses sheet terpilih.");
+    }
+  };
+
+  const handleSqlPreview = async () => {
+    try {
+      setError(null);
+      setSummary(null);
+      setIsSqlPreviewing(true);
+
+      const response = await fetch("/api/import/sql", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          dbType: sqlConfig.dbType,
+          host: sqlConfig.host.trim(),
+          port: sqlConfig.port ? Number(sqlConfig.port) : undefined,
+          database: sqlConfig.database.trim(),
+          username: sqlConfig.username.trim(),
+          password: sqlConfig.password,
+          query: sqlConfig.query.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.message || "Gagal mengambil data dari sumber SQL.");
+      }
+
+      const result = await response.json();
+      const rows = (result.rows || []) as RawRecord[];
+      const rowCount = typeof result.rowCount === "number" ? result.rowCount : rows.length;
+
+      if (!rows.length) {
+        throw new Error("Query tidak menghasilkan data.");
+      }
+
+      setSqlRowCount(rowCount);
+      setUploadedFile(null);
+      setUploadedFileName("");
+      setExcelWorkbook(null);
+      setExcelSheets([]);
+      setSelectedSheet("");
+      processParsedData(rows);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal memproses data SQL.");
       setRawData([]);
       setAvailableFields([]);
       setCriteriaSelections({});
+    } finally {
+      setIsSqlPreviewing(false);
+    }
+  };
+
+  const handleParseData = async () => {
+    if (format === "sql") {
+      await handleSqlPreview();
+      return;
+    }
+
+    setIsParsing(true);
+    try {
+      setError(null);
+      setSummary(null);
+      setSqlRowCount(null);
+
+      if (format === "json") {
+        const parsed = JSON.parse(jsonText) as unknown;
+
+        if (!Array.isArray(parsed)) {
+          throw new Error("Format JSON harus berupa array of objects.");
+        }
+        if (parsed.length === 0) {
+          throw new Error("Array JSON kosong.");
+        }
+
+        const json = parsed as RawRecord[];
+        processParsedData(json);
+      } else if (format === "excel") {
+        if (!uploadedFile) {
+          throw new Error("Pilih file Excel atau CSV terlebih dahulu.");
+        }
+
+        const lowerName = uploadedFile.name.toLowerCase();
+        setUploadedFileName(uploadedFile.name);
+
+        if (lowerName.endsWith(".csv")) {
+          const rows = await parseCsvFile(uploadedFile);
+          processParsedData(rows);
+          setExcelWorkbook(null);
+          setExcelSheets([]);
+          setSelectedSheet("");
+        } else {
+          const parsed = await parseExcelWorkbook(uploadedFile, selectedSheet);
+          setExcelWorkbook(parsed.workbook);
+          setExcelSheets(parsed.sheets);
+          setSelectedSheet(parsed.sheetName);
+          processParsedData(parsed.rows);
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Terjadi kesalahan saat import.");
+      setRawData([]);
+      setAvailableFields([]);
+      setCriteriaSelections({});
+    } finally {
+      setIsParsing(false);
     }
   };
 
@@ -278,7 +485,7 @@ export const ImportAlternatives = ({ isOpen = false, inline = false, onClose, on
       setSummary({
         alternatives: alternativesWithIds.length,
         criteria: selectedCriteria.length,
-        rows: rawData.length,
+        rows: sqlRowCount ?? rawData.length,
         columns: availableFields.length,
         format,
         codeField: fieldMapping.codeField,
@@ -334,33 +541,27 @@ export const ImportAlternatives = ({ isOpen = false, inline = false, onClose, on
                               {
                                   id: "json",
                                   title: "JSON",
-                                  desc: "Tempel array of objects",
-                                  disabled: false
+                                  desc: "Tempel array of objects"
                               },
                               {
                                   id: "excel",
                                   title: "Excel / CSV",
-                                  desc: "Upload + pilih sheet",
-                                  disabled: true
+                                  desc: "Upload file, pilih sheet bila perlu"
                               },
                               {
                                   id: "sql",
                                   title: "SQL",
-                                  desc: "Koneksi DB + query SELECT",
-                                  disabled: true
+                                  desc: "Koneksi ke DB & jalankan query SELECT"
                               }
                           ].map((opt) => (
                               <button
                                   key={opt.id}
                                   onClick={() =>
-                                      setFormat(opt.id as ImportFormat)
+                                      handleFormatSelect(opt.id as ImportFormat)
                                   }
-                                  disabled={opt.disabled}
                                   className={`w-full rounded-lg border px-4 py-4 text-left transition-all ${
                                       format === opt.id
                                           ? "border-primary bg-cyan-50 text-primary shadow-sm"
-                                          : opt.disabled
-                                          ? "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed"
                                           : "border-slate-200 hover:border-primary/50"
                                   }`}
                               >
@@ -368,9 +569,9 @@ export const ImportAlternatives = ({ isOpen = false, inline = false, onClose, on
                                       <div className="font-semibold">
                                           {opt.title}
                                       </div>
-                                      {opt.disabled && (
-                                          <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-                                              Segera hadir
+                                      {opt.id !== "json" && (
+                                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                                              Baru
                                           </span>
                                       )}
                                   </div>
@@ -394,12 +595,19 @@ export const ImportAlternatives = ({ isOpen = false, inline = false, onClose, on
                       <div className="flex items-start justify-between gap-3">
                           <div>
                               <p className="text-sm font-semibold">
-                                  Tempel data {format.toUpperCase()}
+                                  {format === "json"
+                                      ? "Tempel data JSON"
+                                      : format === "excel"
+                                      ? "Upload file Excel/CSV"
+                                      : "Koneksi database & preview SQL"}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                  Format array of objects. Kolom ID wajib, kolom
-                                  numerik bisa dijadikan kriteria (maks{" "}
-                                  {MAX_CRITERIA}).
+                                  {format === "json" &&
+                                      `Format array of objects. Kolom ID wajib, kolom numerik bisa dijadikan kriteria (maks ${MAX_CRITERIA}).`}
+                                  {format === "excel" &&
+                                      "Unggah file .xlsx/.xls/.csv. Kolom numerik akan terdeteksi otomatis sebagai kandidat kriteria."}
+                                  {format === "sql" &&
+                                      "Isi detail koneksi database dan jalankan query SELECT untuk mengambil sample data (maks 100 baris)."}
                               </p>
                           </div>
                           <span className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
@@ -407,56 +615,250 @@ export const ImportAlternatives = ({ isOpen = false, inline = false, onClose, on
                           </span>
                       </div>
 
-                      {format !== "json" && (
-                          <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                              Dukungan {format.toUpperCase()} akan ditambahkan.
-                              Gunakan JSON terlebih dahulu untuk melanjutkan
-                              alur import.
+                      {format === "json" && (
+                          <div className="mt-3 space-y-2">
+                              <div className="flex items-center justify-between">
+                                  <label className="text-xs font-medium text-muted-foreground">
+                                      Tempel JSON di sini
+                                  </label>
+                                  <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-xs"
+                                      onClick={() =>
+                                          setJsonText(SAMPLE_JSON.trim())
+                                      }
+                                  >
+                                      Gunakan contoh data
+                                  </Button>
+                              </div>
+                              <textarea
+                                  className="flex min-h-[200px] w-full rounded-lg border border-border bg-white px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 shadow-sm"
+                                  placeholder={
+                                      '[\n  {\n    "alt_id": "A1",\n    "alt_name": "Mobil A",\n    "description": "Hatchback 1.2L",\n    "harga": 180000000,\n    "emisi_co2": 110,\n    ...\n  }\n]'
+                                  }
+                                  value={jsonText}
+                                  onChange={(e) => setJsonText(e.target.value)}
+                              />
+                              <div className="flex flex-wrap items-center justify-between text-xs text-muted-foreground">
+                                  <span>
+                                      Tip: Nama kolom bebas, akan di-mapping
+                                      pada langkah berikutnya.
+                                  </span>
+                                  <span>
+                                      {jsonText.length.toLocaleString()} karakter
+                                  </span>
+                              </div>
                           </div>
                       )}
 
-                      <div className="mt-3 space-y-2">
-                          <div className="flex items-center justify-between">
+                      {format === "excel" && (
+                          <div className="mt-3 space-y-3">
                               <label className="text-xs font-medium text-muted-foreground">
-                                  Tempel JSON di sini
+                                  Upload file Excel / CSV
+                                  <input
+                                      type="file"
+                                      accept=".xlsx,.xls,.csv"
+                                      className="mt-1 flex h-10 w-full rounded-md border border-border bg-white px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                                      onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          setUploadedFile(file || null);
+                                          setUploadedFileName(file?.name || "");
+                                          setExcelWorkbook(null);
+                                          setExcelSheets([]);
+                                          setSelectedSheet("");
+                                          resetParsedData();
+                                      }}
+                                  />
                               </label>
-                              <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-xs"
-                                  onClick={() =>
-                                      setJsonText(SAMPLE_JSON.trim())
-                                  }
-                              >
-                                  Gunakan contoh data
-                              </Button>
+
+                              {uploadedFileName && (
+                                  <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                                      <div className="flex items-center justify-between">
+                                          <span className="font-semibold">
+                                              {uploadedFileName}
+                                          </span>
+                                          {uploadedFile?.size && (
+                                              <span className="text-[11px] text-muted-foreground">
+                                                  {(uploadedFile.size / 1024).toFixed(
+                                                      1
+                                                  )}{" "}
+                                                  KB
+                                              </span>
+                                          )}
+                                      </div>
+                                      <div className="text-muted-foreground">
+                                          Sheet pertama akan dibaca otomatis.
+                                          Jika multi-sheet, pilih sheet saat
+                                          preview.
+                                      </div>
+                                  </div>
+                              )}
+
+                              <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-muted-foreground space-y-1">
+                                  <div>
+                                      Gunakan header baris pertama untuk nama
+                                      kolom.
+                                  </div>
+                                  <div>
+                                      Kolom numerik akan ditandai sebagai
+                                      kandidat kriteria (maks {MAX_CRITERIA}).
+                                  </div>
+                                  <div>
+                                      File CSV didukung; pilih delimiter standar
+                                      koma.
+                                  </div>
+                              </div>
                           </div>
-                          <textarea
-                              className="flex min-h-[200px] w-full rounded-lg border border-border bg-white px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 shadow-sm"
-                              placeholder={
-                                  '[\n  {\n    "alt_id": "A1",\n    "alt_name": "Mobil A",\n    "description": "Hatchback 1.2L",\n    "harga": 180000000,\n    "emisi_co2": 110,\n    ...\n  }\n]'
-                              }
-                              value={jsonText}
-                              onChange={(e) => setJsonText(e.target.value)}
-                          />
-                          <div className="flex flex-wrap items-center justify-between text-xs text-muted-foreground">
-                              <span>
-                                  Tip: Nama kolom bebas, akan di-mapping pada
-                                  langkah berikutnya.
-                              </span>
-                              <span>
-                                  {jsonText.length.toLocaleString()} karakter
-                              </span>
+                      )}
+
+                      {format === "sql" && (
+                          <div className="mt-3 space-y-3">
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                  <label className="text-xs font-medium text-muted-foreground">
+                                      Jenis database
+                                      <select
+                                          className="mt-1 flex h-9 w-full rounded-md border border-border bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                                          value={sqlConfig.dbType}
+                                          onChange={(e) =>
+                                              setSqlConfig((prev) => ({
+                                                  ...prev,
+                                                  dbType: e.target
+                                                      .value as "postgres" | "mysql"
+                                              }))
+                                          }
+                                      >
+                                          <option value="postgres">PostgreSQL</option>
+                                          <option value="mysql">MySQL</option>
+                                      </select>
+                                  </label>
+                                  <label className="text-xs font-medium text-muted-foreground">
+                                      Host / IP
+                                      <input
+                                          className="mt-1 flex h-9 w-full rounded-md border border-border bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                                          value={sqlConfig.host}
+                                          onChange={(e) =>
+                                              setSqlConfig((prev) => ({
+                                                  ...prev,
+                                                  host: e.target.value
+                                              }))
+                                          }
+                                          placeholder="localhost"
+                                      />
+                                  </label>
+                                  <label className="text-xs font-medium text-muted-foreground">
+                                      Port
+                                      <input
+                                          className="mt-1 flex h-9 w-full rounded-md border border-border bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                                          value={sqlConfig.port}
+                                          onChange={(e) =>
+                                              setSqlConfig((prev) => ({
+                                                  ...prev,
+                                                  port: e.target.value
+                                              }))
+                                          }
+                                          placeholder={
+                                              sqlConfig.dbType === "postgres"
+                                                  ? "5432"
+                                                  : "3306"
+                                          }
+                                      />
+                                  </label>
+                                  <label className="text-xs font-medium text-muted-foreground">
+                                      Database
+                                      <input
+                                          className="mt-1 flex h-9 w-full rounded-md border border-border bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                                          value={sqlConfig.database}
+                                          onChange={(e) =>
+                                              setSqlConfig((prev) => ({
+                                                  ...prev,
+                                                  database: e.target.value
+                                              }))
+                                          }
+                                          placeholder="nama_database"
+                                      />
+                                  </label>
+                                  <label className="text-xs font-medium text-muted-foreground">
+                                      Username
+                                      <input
+                                          className="mt-1 flex h-9 w-full rounded-md border border-border bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                                          value={sqlConfig.username}
+                                          onChange={(e) =>
+                                              setSqlConfig((prev) => ({
+                                                  ...prev,
+                                                  username: e.target.value
+                                              }))
+                                          }
+                                          placeholder="db_user"
+                                      />
+                                  </label>
+                                  <label className="text-xs font-medium text-muted-foreground">
+                                      Password
+                                      <input
+                                          type="password"
+                                          className="mt-1 flex h-9 w-full rounded-md border border-border bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                                          value={sqlConfig.password}
+                                          onChange={(e) =>
+                                              setSqlConfig((prev) => ({
+                                                  ...prev,
+                                                  password: e.target.value
+                                              }))
+                                          }
+                                          placeholder="••••••"
+                                      />
+                                  </label>
+                              </div>
+
+                              <label className="text-xs font-medium text-muted-foreground">
+                                  SQL Query (hanya SELECT)
+                                  <textarea
+                                      className="mt-1 flex min-h-[120px] w-full rounded-lg border border-border bg-white px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 shadow-sm"
+                                      value={sqlConfig.query}
+                                      onChange={(e) =>
+                                          setSqlConfig((prev) => ({
+                                              ...prev,
+                                              query: e.target.value
+                                          }))
+                                      }
+                                      placeholder="SELECT * FROM alternatif LIMIT 50"
+                                  />
+                              </label>
+
+                              <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-muted-foreground space-y-1">
+                                  <div>
+                                      Hanya perintah SELECT yang diizinkan untuk
+                                      preview, data dibatasi 100 baris pertama.
+                                  </div>
+                                  <div>
+                                      Kredensial tidak disimpan; hanya dipakai
+                                      sekali untuk mengambil sample.
+                                  </div>
+                                  {typeof sqlRowCount === "number" && (
+                                      <div className="text-emerald-700 font-semibold">
+                                          Preview terakhir: {sqlRowCount} baris
+                                          terdeteksi
+                                      </div>
+                                  )}
+                              </div>
                           </div>
-                      </div>
+                      )}
                   </div>
 
                   <div className="flex justify-between">
                       <Button variant="ghost" onClick={() => setStep("format")}>
                           Kembali
                       </Button>
-                      <Button onClick={handleParseData} disabled={!canParse}>
-                          Parse &amp; Preview
+                      <Button
+                          onClick={handleParseData}
+                          disabled={!canParse || isParsing || isSqlPreviewing}
+                      >
+                          {format === "sql"
+                              ? isSqlPreviewing
+                                  ? "Mengambil data..."
+                                  : "Preview SQL"
+                              : isParsing
+                              ? "Memproses..."
+                              : "Parse & Preview"}
                       </Button>
                   </div>
               </div>
@@ -484,6 +886,48 @@ export const ImportAlternatives = ({ isOpen = false, inline = false, onClose, on
                                   baris pertama.
                               </div>
                           </div>
+
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                              <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+                                  Sumber: {format.toUpperCase()}
+                              </span>
+                              {uploadedFileName && (
+                                  <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+                                      {uploadedFileName}
+                                  </span>
+                              )}
+                              {format === "sql" &&
+                                  typeof sqlRowCount === "number" && (
+                                      <span>
+                                          Hasil query: {sqlRowCount} baris
+                                          (menampilkan {rawData.length})
+                                      </span>
+                                  )}
+                          </div>
+
+                          {excelSheets.length > 1 && (
+                              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                                  <span className="text-muted-foreground">
+                                      Pilih sheet:
+                                  </span>
+                                  <select
+                                      value={selectedSheet}
+                                      onChange={(e) =>
+                                          handleSheetChange(e.target.value)
+                                      }
+                                      className="h-8 rounded-md border border-border bg-white px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                                  >
+                                      {excelSheets.map((sheet) => (
+                                          <option key={sheet} value={sheet}>
+                                              {sheet}
+                                          </option>
+                                      ))}
+                                  </select>
+                                  <span className="text-[11px] text-muted-foreground">
+                                      Mengganti sheet akan memuat ulang preview.
+                                  </span>
+                              </div>
+                          )}
 
                           <div className="mt-2 overflow-x-auto">
                               <table className="min-w-full text-xs">
