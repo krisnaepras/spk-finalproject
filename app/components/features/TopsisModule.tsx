@@ -166,6 +166,7 @@ export const TopsisModule = ({
               key={tab.id}
               variant={activeTab === tab.id ? "primary" : "outline"}
               size="sm"
+              className="w-full sm:w-auto"
               onClick={() => onTabChange(tab.id)}
             >
               {tab.label}

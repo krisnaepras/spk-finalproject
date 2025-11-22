@@ -35,12 +35,12 @@ export const ResultsView = ({ workspace }: ResultsViewProps) => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 text-2xl font-bold text-white shadow-[0_0_20px_rgba(6,182,212,0.5)]">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 text-2xl font-bold text-white shadow-[0_0_20px_rgba(6,182,212,0.5)] mx-auto sm:mx-0">
               1
             </div>
-            <div>
-              <h3 className="text-2xl font-bold text-foreground">{winner?.name}</h3>
+            <div className="text-center sm:text-left">
+              <h3 className="text-2xl font-bold text-foreground break-words">{winner?.name}</h3>
               <p className="text-muted-foreground">{winner?.description || "Tidak ada deskripsi"}</p>
               <Badge variant="success" className="mt-2">
                 Skor: {results[0].score.toFixed(4)}

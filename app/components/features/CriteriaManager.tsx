@@ -77,12 +77,12 @@ export const CriteriaManager = ({
                 placeholder="Keterangan tambahan..."
               />
             </div>
-            <div className="flex gap-2 pt-2">
-              <Button type="submit" className="w-full">
+            <div className="flex flex-wrap gap-2 pt-2">
+              <Button type="submit" className="w-full sm:w-auto flex-1">
                 {isEditing ? "Simpan" : "Tambah"}
               </Button>
               {isEditing && (
-                <Button type="button" variant="outline" onClick={onReset}>
+                <Button type="button" variant="outline" onClick={onReset} className="w-full sm:w-auto">
                   Batal
                 </Button>
               )}
@@ -129,7 +129,7 @@ export const CriteriaManager = ({
                       </Td>
                       <Td>{item.weight ? (item.weight * 100).toFixed(2) + "%" : "-"}</Td>
                       <Td className="text-right">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex flex-wrap justify-end gap-2">
                           <Button
                             variant="ghost"
                             size="sm"

@@ -703,45 +703,35 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
       <header className="sticky top-0 z-40 w-full border-b border-border bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold">
-              SPK
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-wrap items-center justify-between gap-3 py-3">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold">
+                SPK
+              </div>
+              <h1 className="text-base sm:text-lg font-bold tracking-tight hidden sm:block">SPK D – AHP + TOPSIS</h1>
             </div>
-            <h1 className="text-lg font-bold tracking-tight hidden sm:block">SPK D – AHP + TOPSIS</h1>
-          </div>
-          
-          <div className="flex items-center gap-2">
-             <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsNewCalcConfirmOpen(true)}
-              >
+
+            <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+              <Button variant="outline" size="sm" onClick={() => setIsNewCalcConfirmOpen(true)}>
                 Baru
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsSaveDialogOpen(true)}
-              >
+              <Button variant="outline" size="sm" onClick={() => setIsSaveDialogOpen(true)}>
                 Simpan
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsHistoryListOpen(true)}
-              >
+              <Button variant="outline" size="sm" onClick={() => setIsHistoryListOpen(true)}>
                 Riwayat
               </Button>
-            <div className="h-6 w-px bg-border mx-2" />
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
-              Keluar
-            </Button>
+              <div className="hidden h-6 w-px bg-border sm:block" />
+              <Button variant="ghost" size="sm" className="w-full sm:w-auto" onClick={handleLogout}>
+                Keluar
+              </Button>
+            </div>
           </div>
         </div>
         <div className="border-t border-border bg-muted/30">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="flex space-x-1 overflow-x-auto py-2 scrollbar-hide">
+          <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
+            <div className="flex gap-2 overflow-x-auto py-2 scrollbar-hide">
               {mainTabs.map((tab) => (
                 <button
                   key={tab.id}
