@@ -762,12 +762,12 @@ export default function Home() {
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {notification && (
-          <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-900 shadow-sm animate-in fade-in slide-in-from-top-2">
+          <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-900 shadow-sm">
             {notification}
           </div>
         )}
 
-        <div className="animate-in fade-in duration-500">
+        <div>
           {mainTab === "dashboard" && (
             <DashboardView workspace={workspace} onNavigate={(tab) => setMainTab(tab as MainTab)} />
           )}

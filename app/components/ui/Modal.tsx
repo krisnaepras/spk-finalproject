@@ -43,8 +43,8 @@ export const Modal = ({
   if (!mounted || !isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className={`relative w-full ${maxWidthClass} animate-in zoom-in-95 duration-200`}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20 backdrop-blur-sm p-4">
+      <div className={`relative w-full ${maxWidthClass}`}>
         <Card className="w-full shadow-2xl border-slate-200">
           <CardHeader>
             <div className="flex items-center justify-between">
