@@ -22,6 +22,14 @@ async function ensureHistoryTable(client: PostgresClient) {
       "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
+  // Backfill untuk skema lama yang belum memiliki kolom userId
+  await client.query(`ALTER TABLE "WorkspaceHistory" ADD COLUMN IF NOT EXISTS "userId" TEXT;`);
+  const nullUserCheck = await client.query<{ count: string }>(
+    `SELECT COUNT(*)::int AS count FROM "WorkspaceHistory" WHERE "userId" IS NULL`,
+  );
+  if ((nullUserCheck.rows[0]?.count ?? "0") === "0") {
+    await client.query(`ALTER TABLE "WorkspaceHistory" ALTER COLUMN "userId" SET NOT NULL`);
+  }
   await client.query(`
     CREATE INDEX IF NOT EXISTS "WorkspaceHistory_user_idx"
     ON "WorkspaceHistory" ("userId", "createdAt" DESC);
