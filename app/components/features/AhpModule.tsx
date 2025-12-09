@@ -172,7 +172,7 @@ export const AhpModule = ({
                     <CardTitle>Matriks Perbandingan Berpasangan</CardTitle>
                     <CardDescription>
                         Isi nilai perbandingan antar kriteria (skala 1-9). Panel
-                        kanan menampilkan bobot &amp; CR yang berubah otomatis
+                        kanan menampilkan bobot, Lambda Max, Consistency Index(CI) &amp; Consistency Ratio (CR) yang berubah otomatis
                         saat matriks diubah.
                     </CardDescription>
                 </CardHeader>

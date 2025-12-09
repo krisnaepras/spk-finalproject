@@ -61,7 +61,7 @@ export const DashboardView = ({
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             <Card className="col-span-full">
                 <CardHeader>
-                    <CardTitle>Ringkasan Proyek</CardTitle>
+                    <CardTitle>Ringkasan</CardTitle>
                     <CardDescription>
                         Pantau status setiap tahap sebelum melanjutkan ke proses
                         perhitungan keputusan.
@@ -104,34 +104,6 @@ export const DashboardView = ({
                             </div>
                         ))}
                     </div>
-                </CardContent>
-            </Card>
-
-            <Card className="col-span-full lg:col-span-2">
-                <CardHeader>
-                    <CardTitle>Informasi Proyek</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
-                            <dt className="text-sm font-medium text-muted-foreground">
-                                Nama Proyek
-                            </dt>
-                            <dd className="text-sm font-semibold text-foreground">
-                                {workspace.projectName || "Proyek Tanpa Nama"}
-                            </dd>
-                        </div>
-                        <div>
-                            <dt className="text-sm font-medium text-muted-foreground">
-                                Terakhir Diubah
-                            </dt>
-                            <dd className="text-sm font-semibold text-foreground">
-                                {new Date().toLocaleDateString("id-ID", {
-                                    dateStyle: "full"
-                                })}
-                            </dd>
-                        </div>
-                    </dl>
                 </CardContent>
             </Card>
 
