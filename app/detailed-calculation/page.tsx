@@ -654,80 +654,49 @@ export default function DetailedCalculationPage() {
                         {/* Show calculation for first criteria */}
                         <div className="bg-purple-50 p-4 rounded-lg mb-4">
                             <h4 className="font-semibold text-sm mb-2">
-                                Contoh Perhitungan {criteria[0]?.code}:
+                                Contoh Detail Perhitungan Normalisasi {criteria[0]?.code}:
                             </h4>
-                            <div className="space-y-1 text-sm font-mono">
+                            <div className="space-y-2 text-sm font-mono">
                                 {normCalculations[0] && (
                                     <>
-                                        <p>
-                                            Σ({criteria[0].code})² ={" "}
-                                            {alternatives
-                                                .map(
-                                                    (alt, i) =>
-                                                        `${decisionMatrix[
-                                                            i
-                                                        ][0].toFixed(2)}²`
-                                                )
-                                                .join(" + ")}
-                                        </p>
-                                        <p className="ml-6">
-                                            ={" "}
-                                            {alternatives
-                                                .map(
-                                                    (alt, i) =>
-                                                        `${Math.pow(
-                                                            decisionMatrix[
-                                                                i
-                                                            ][0],
-                                                            2
-                                                        ).toFixed(4)}`
-                                                )
-                                                .join(" + ")}
-                                        </p>
-                                        <p className="ml-6">
-                                            ={" "}
-                                            {normCalculations[0].sumSquares.toFixed(
-                                                4
-                                            )}
-                                        </p>
-                                        <p>
-                                            √Σ({criteria[0].code})² = √
-                                            {normCalculations[0].sumSquares.toFixed(
-                                                4
-                                            )}{" "}
-                                            ={" "}
-                                            <span className="font-bold text-purple-700">
-                                                {normCalculations[0].sqrtSum.toFixed(
-                                                    4
-                                                )}
-                                            </span>
-                                        </p>
-                                        <div className="mt-2 pt-2 border-t border-purple-200">
-                                            {alternatives
-                                                .slice(0, 2)
-                                                .map((alt, i) => (
-                                                    <p key={alt.id}>
-                                                        r
-                                                        <sub>
-                                                            {alt.code},
-                                                            {criteria[0].code}
-                                                        </sub>{" "}
-                                                        ={" "}
-                                                        {decisionMatrix[
-                                                            i
-                                                        ][0].toFixed(2)}{" "}
-                                                        /{" "}
-                                                        {normCalculations[0].sqrtSum.toFixed(
-                                                            4
-                                                        )}{" "}
-                                                        ={" "}
-                                                        <span className="font-bold text-purple-700">
-                                                            {normalizedMatrix[
-                                                                i
-                                                            ][0].toFixed(4)}
-                                                        </span>
-                                                    </p>
-                                                ))}
+                                        <div className="bg-white/60 p-3 rounded">
+                                            <p className="font-semibold text-purple-900 mb-2">Langkah 1: Kuadratkan setiap nilai</p>
+                                            {alternatives.slice(0, 3).map((alt, i) => (
+                                                <p key={alt.id} className="ml-4">
+                                                    {alt.code}: {decisionMatrix[i][0].toFixed(2)}² = {Math.pow(decisionMatrix[i][0], 2).toFixed(4)}
+                                                </p>
+                                            ))}
+                                            {alternatives.length > 3 && <p className="ml-4 text-muted-foreground">... ({alternatives.length - 3} data lainnya)</p>}
+                                        </div>
+
+                                        <div className="bg-white/60 p-3 rounded">
+                                            <p className="font-semibold text-purple-900 mb-2">Langkah 2: Jumlahkan semua kuadrat</p>
+                                            <p className="ml-4">
+                                                Σ({criteria[0].code})² = {alternatives.slice(0, 3).map((alt, i) => 
+                                                    Math.pow(decisionMatrix[i][0], 2).toFixed(4)
+                                                ).join(" + ")}
+                                                {alternatives.length > 3 && " + ..."}
+                                            </p>
+                                            <p className="ml-4 mt-1">
+                                                = <span className="font-bold">{normCalculations[0].sumSquares.toFixed(4)}</span>
+                                            </p>
+                                        </div>
+
+                                        <div className="bg-white/60 p-3 rounded">
+                                            <p className="font-semibold text-purple-900 mb-2">Langkah 3: Akar kuadrat dari jumlah</p>
+                                            <p className="ml-4">
+                                                √{normCalculations[0].sumSquares.toFixed(4)} = <span className="font-bold text-purple-700">{normCalculations[0].sqrtSum.toFixed(4)}</span>
+                                            </p>
+                                        </div>
+
+                                        <div className="bg-white/60 p-3 rounded">
+                                            <p className="font-semibold text-purple-900 mb-2">Langkah 4: Bagi setiap nilai dengan akar</p>
+                                            {alternatives.slice(0, 3).map((alt, i) => (
+                                                <p key={alt.id} className="ml-4">
+                                                    r<sub>{alt.code},{criteria[0].code}</sub> = {decisionMatrix[i][0].toFixed(2)} / {normCalculations[0].sqrtSum.toFixed(4)} = <span className="font-bold text-purple-700">{normalizedMatrix[i][0].toFixed(4)}</span>
+                                                </p>
+                                            ))}
+                                            {alternatives.length > 3 && <p className="ml-4 text-muted-foreground">... ({alternatives.length - 3} data lainnya)</p>}
                                         </div>
                                     </>
                                 )}
@@ -774,30 +743,54 @@ export default function DetailedCalculationPage() {
                             <sub>ij</sub>
                         </p>
 
-                        {/* Show calculation example */}
-                        <div className="bg-cyan-50 p-4 rounded-lg mb-4">
-                            <h4 className="font-semibold text-sm mb-2">
-                                Contoh Perhitungan:
+                        {/* Show calculation steps */}
+                        <div className="bg-cyan-50 p-4 rounded-lg mb-4 border border-cyan-200">
+                            <h4 className="font-semibold text-sm mb-3">
+                                Detail Perhitungan Pembobotan:
                             </h4>
-                            <div className="space-y-1 text-sm font-mono">
-                                {alternatives.slice(0, 2).map((alt, i) => (
-                                    <div key={alt.id}>
-                                        <p>
-                                            y
-                                            <sub>
-                                                {alt.code},{criteria[0].code}
-                                            </sub>{" "}
-                                            = {criteria[0].weight.toFixed(4)} ×{" "}
-                                            {normalizedMatrix[i][0].toFixed(4)}{" "}
-                                            ={" "}
-                                            <span className="font-bold text-cyan-700">
-                                                {weightedMatrix[i][0].toFixed(
-                                                    4
-                                                )}
-                                            </span>
-                                        </p>
+                            
+                            <div className="space-y-3">
+                                {/* Step 1 */}
+                                <div className="bg-white/60 p-3 rounded">
+                                    <p className="text-sm font-semibold text-cyan-800 mb-1">
+                                        Langkah 1: Ambil bobot kriteria dari AHP
+                                    </p>
+                                    <div className="text-sm font-mono">
+                                        {criteria.map((c) => (
+                                            <p key={c.id}>
+                                                w<sub>{c.code}</sub> = {c.weight.toFixed(4)}
+                                            </p>
+                                        ))}
                                     </div>
-                                ))}
+                                </div>
+
+                                {/* Step 2 */}
+                                <div className="bg-white/60 p-3 rounded">
+                                    <p className="text-sm font-semibold text-cyan-800 mb-1">
+                                        Langkah 2: Kalikan bobot dengan nilai ternormalisasi
+                                    </p>
+                                    <div className="text-sm font-mono space-y-1">
+                                        {alternatives.slice(0, 2).map((alt, i) => (
+                                            <p key={alt.id}>
+                                                y<sub>{alt.code},{criteria[0].code}</sub> = 
+                                                {" "}{criteria[0].weight.toFixed(4)} × {normalizedMatrix[i][0].toFixed(4)} = 
+                                                <span className="font-bold text-cyan-700">
+                                                    {" "}{weightedMatrix[i][0].toFixed(4)}
+                                                </span>
+                                            </p>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Step 3 */}
+                                <div className="bg-white/60 p-3 rounded">
+                                    <p className="text-sm font-semibold text-cyan-800 mb-1">
+                                        Langkah 3: Ulangi untuk semua alternatif dan kriteria
+                                    </p>
+                                    <p className="text-sm text-gray-600">
+                                        Hasil lengkap ada di tabel di bawah
+                                    </p>
+                                </div>
                             </div>
                         </div>
 
@@ -836,6 +829,28 @@ export default function DetailedCalculationPage() {
                         <h3 className="font-semibold text-lg mb-3">
                             2.4. Solusi Ideal Positif (A+) dan Negatif (A−)
                         </h3>
+                        
+                        {/* Explanation Box */}
+                        <div className="bg-blue-50 p-4 rounded-lg mb-4 border border-blue-200">
+                            <h4 className="font-semibold text-sm mb-2 text-blue-900">
+                                Logika Penentuan Solusi Ideal:
+                            </h4>
+                            <ul className="text-sm space-y-2 text-gray-700">
+                                <li>
+                                    <span className="font-semibold text-green-700">Kriteria BENEFIT:</span> 
+                                    {" "}A+ = nilai <strong>maksimal</strong>, A− = nilai <strong>minimal</strong>
+                                    <br/>
+                                    <span className="text-xs text-gray-600">(Semakin besar semakin baik)</span>
+                                </li>
+                                <li>
+                                    <span className="font-semibold text-red-700">Kriteria COST:</span> 
+                                    {" "}A+ = nilai <strong>minimal</strong>, A− = nilai <strong>maksimal</strong>
+                                    <br/>
+                                    <span className="text-xs text-gray-600">(Semakin kecil semakin baik)</span>
+                                </li>
+                            </ul>
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="bg-green-50 p-4 rounded-lg border border-green-200">
                                 <h4 className="font-semibold text-green-900 mb-3">
@@ -852,18 +867,16 @@ export default function DetailedCalculationPage() {
                                                 key={crit.id}
                                                 className="font-mono"
                                             >
-                                                <p className="text-green-800">
-                                                    A+<sub>{crit.code}</sub> ={" "}
-                                                    {isMax ? "max" : "min"}(
-                                                    {values
-                                                        .map((v) =>
-                                                            v.toFixed(4)
-                                                        )
-                                                        .join(", ")}
+                                                <p className="text-green-800 mb-1">
+                                                    A+<sub>{crit.code}</sub> = {isMax ? "max" : "min"}
+                                                </p>
+                                                <p className="text-xs text-gray-600 mb-1">
+                                                    = {isMax ? "max" : "min"}(
+                                                    {values.map((v) => v.toFixed(4)).join(", ")}
                                                     )
                                                 </p>
-                                                <p className="text-green-900 font-semibold ml-4">
-                                                    = {aPlus[j].toFixed(4)}
+                                                <p className="font-bold text-green-700">
+                                                    = {idealPositive[j].toFixed(4)}
                                                 </p>
                                             </div>
                                         );
@@ -880,24 +893,22 @@ export default function DetailedCalculationPage() {
                                         const values = weightedMatrix.map(
                                             (row) => row[j]
                                         );
-                                        const isMin = crit.type === "BENEFIT";
+                                        const isMax = crit.type === "BENEFIT";
                                         return (
                                             <div
                                                 key={crit.id}
                                                 className="font-mono"
                                             >
-                                                <p className="text-red-800">
-                                                    A−<sub>{crit.code}</sub> ={" "}
-                                                    {isMin ? "min" : "max"}(
-                                                    {values
-                                                        .map((v) =>
-                                                            v.toFixed(4)
-                                                        )
-                                                        .join(", ")}
+                                                <p className="text-red-800 mb-1">
+                                                    A−<sub>{crit.code}</sub> = {isMax ? "min" : "max"}
+                                                </p>
+                                                <p className="text-xs text-gray-600 mb-1">
+                                                    = {isMax ? "min" : "max"}(
+                                                    {values.map((v) => v.toFixed(4)).join(", ")}
                                                     )
                                                 </p>
-                                                <p className="text-red-900 font-semibold ml-4">
-                                                    = {aMinus[j].toFixed(4)}
+                                                <p className="font-bold text-red-700">
+                                                    = {idealNegative[j].toFixed(4)}
                                                 </p>
                                             </div>
                                         );
@@ -918,95 +929,100 @@ export default function DetailedCalculationPage() {
                         </p>
 
                         {/* Show detailed calculation for first alternative */}
-                        <div className="bg-orange-50 p-4 rounded-lg mb-4">
-                            <h4 className="font-semibold text-sm mb-2">
-                                Contoh Perhitungan {alternatives[0]?.code}:
+                        <div className="bg-orange-50 p-4 rounded-lg mb-4 border border-orange-200">
+                            <h4 className="font-semibold text-sm mb-3">
+                                Detail Perhitungan untuk {alternatives[0]?.code}:
                             </h4>
-                            <div className="space-y-2 text-sm font-mono">
-                                <div>
-                                    <p className="font-semibold text-orange-900 mb-1">
-                                        D+ (Jarak ke Ideal Positif):
+                            
+                            <div className="space-y-3">
+                                {/* D+ Calculation Steps */}
+                                <div className="bg-white/60 p-3 rounded">
+                                    <p className="text-sm font-semibold text-orange-800 mb-2">
+                                        Langkah 1: Hitung D+ (Jarak ke Ideal Positif)
                                     </p>
-                                    <p>
-                                        D+<sub>{alternatives[0].code}</sub> = √(
-                                        {distances[0].calculations.dPlusSquares
-                                            .map(
-                                                (calc, j) =>
-                                                    `(${calc.value.toFixed(
-                                                        4
-                                                    )} - ${calc.ideal.toFixed(
-                                                        4
-                                                    )})²`
-                                            )
-                                            .join(" + ")}
-                                        )
-                                    </p>
-                                    <p className="ml-6">
-                                        = √(
-                                        {distances[0].calculations.dPlusSquares
-                                            .map(
-                                                (calc) =>
-                                                    `${calc.square.toFixed(6)}`
-                                            )
-                                            .join(" + ")}
-                                        )
-                                    </p>
-                                    <p className="ml-6">
-                                        = √
-                                        {distances[0].calculations.dPlusSquares
-                                            .reduce(
-                                                (sum, calc) =>
-                                                    sum + calc.square,
-                                                0
-                                            )
-                                            .toFixed(6)}
-                                    </p>
-                                    <p className="ml-6 font-bold text-orange-700">
-                                        = {distances[0].dPlus.toFixed(4)}
-                                    </p>
+                                    
+                                    <div className="text-sm font-mono space-y-1">
+                                        <p className="font-semibold">a) Hitung selisih dan kuadrat untuk tiap kriteria:</p>
+                                        {distances[0].calculations.dPlusSquares.map((calc, j) => (
+                                            <p key={j} className="ml-4">
+                                                (y<sub>{j+1}</sub> - A+<sub>{j+1}</sub>)² = 
+                                                ({calc.value.toFixed(4)} - {calc.ideal.toFixed(4)})² = 
+                                                ({(calc.value - calc.ideal).toFixed(4)})² = 
+                                                <span className="text-orange-700 font-semibold">
+                                                    {" "}{calc.square.toFixed(6)}
+                                                </span>
+                                            </p>
+                                        ))}
+                                        
+                                        <p className="font-semibold mt-2">b) Jumlahkan semua kuadrat:</p>
+                                        <p className="ml-4">
+                                            Σ = {distances[0].calculations.dPlusSquares
+                                                .map((calc) => calc.square.toFixed(6))
+                                                .join(" + ")}
+                                        </p>
+                                        <p className="ml-4">
+                                            = <span className="text-orange-700 font-semibold">
+                                                {distances[0].calculations.dPlusSquares
+                                                    .reduce((sum, calc) => sum + calc.square, 0)
+                                                    .toFixed(6)}
+                                            </span>
+                                        </p>
+                                        
+                                        <p className="font-semibold mt-2">c) Akar kuadrat dari jumlah:</p>
+                                        <p className="ml-4">
+                                            D+ = √{distances[0].calculations.dPlusSquares
+                                                .reduce((sum, calc) => sum + calc.square, 0)
+                                                .toFixed(6)} = 
+                                            <span className="text-orange-700 font-bold text-base">
+                                                {" "}{distances[0].dPlus.toFixed(4)}
+                                            </span>
+                                        </p>
+                                    </div>
                                 </div>
 
-                                <div className="pt-2 border-t border-orange-200">
-                                    <p className="font-semibold text-orange-900 mb-1">
-                                        D− (Jarak ke Ideal Negatif):
+                                {/* D- Calculation Steps */}
+                                <div className="bg-white/60 p-3 rounded">
+                                    <p className="text-sm font-semibold text-orange-800 mb-2">
+                                        Langkah 2: Hitung D− (Jarak ke Ideal Negatif)
                                     </p>
-                                    <p>
-                                        D−<sub>{alternatives[0].code}</sub> = √(
-                                        {distances[0].calculations.dMinusSquares
-                                            .map(
-                                                (calc, j) =>
-                                                    `(${calc.value.toFixed(
-                                                        4
-                                                    )} - ${calc.ideal.toFixed(
-                                                        4
-                                                    )})²`
-                                            )
-                                            .join(" + ")}
-                                        )
-                                    </p>
-                                    <p className="ml-6">
-                                        = √(
-                                        {distances[0].calculations.dMinusSquares
-                                            .map(
-                                                (calc) =>
-                                                    `${calc.square.toFixed(6)}`
-                                            )
-                                            .join(" + ")}
-                                        )
-                                    </p>
-                                    <p className="ml-6">
-                                        = √
-                                        {distances[0].calculations.dMinusSquares
-                                            .reduce(
-                                                (sum, calc) =>
-                                                    sum + calc.square,
-                                                0
-                                            )
-                                            .toFixed(6)}
-                                    </p>
-                                    <p className="ml-6 font-bold text-orange-700">
-                                        = {distances[0].dMinus.toFixed(4)}
-                                    </p>
+                                    
+                                    <div className="text-sm font-mono space-y-1">
+                                        <p className="font-semibold">a) Hitung selisih dan kuadrat untuk tiap kriteria:</p>
+                                        {distances[0].calculations.dMinusSquares.map((calc, j) => (
+                                            <p key={j} className="ml-4">
+                                                (y<sub>{j+1}</sub> - A−<sub>{j+1}</sub>)² = 
+                                                ({calc.value.toFixed(4)} - {calc.ideal.toFixed(4)})² = 
+                                                ({(calc.value - calc.ideal).toFixed(4)})² = 
+                                                <span className="text-orange-700 font-semibold">
+                                                    {" "}{calc.square.toFixed(6)}
+                                                </span>
+                                            </p>
+                                        ))}
+                                        
+                                        <p className="font-semibold mt-2">b) Jumlahkan semua kuadrat:</p>
+                                        <p className="ml-4">
+                                            Σ = {distances[0].calculations.dMinusSquares
+                                                .map((calc) => calc.square.toFixed(6))
+                                                .join(" + ")}
+                                        </p>
+                                        <p className="ml-4">
+                                            = <span className="text-orange-700 font-semibold">
+                                                {distances[0].calculations.dMinusSquares
+                                                    .reduce((sum, calc) => sum + calc.square, 0)
+                                                    .toFixed(6)}
+                                            </span>
+                                        </p>
+                                        
+                                        <p className="font-semibold mt-2">c) Akar kuadrat dari jumlah:</p>
+                                        <p className="ml-4">
+                                            D− = √{distances[0].calculations.dMinusSquares
+                                                .reduce((sum, calc) => sum + calc.square, 0)
+                                                .toFixed(6)} = 
+                                            <span className="text-orange-700 font-bold text-base">
+                                                {" "}{distances[0].dMinus.toFixed(4)}
+                                            </span>
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1050,9 +1066,78 @@ export default function DetailedCalculationPage() {
                         </p>
 
                         {/* Show calculation examples */}
-                        <div className="bg-indigo-50 p-4 rounded-lg mb-4">
+                        <div className="bg-indigo-50 p-4 rounded-lg mb-4 border border-indigo-200">
+                            <h4 className="font-semibold text-sm mb-3">
+                                Detail Perhitungan untuk {alternatives[0]?.code}:
+                            </h4>
+                            
+                            <div className="space-y-3">
+                                {/* Step 1 */}
+                                <div className="bg-white/60 p-3 rounded">
+                                    <p className="text-sm font-semibold text-indigo-800 mb-1">
+                                        Langkah 1: Ambil nilai D+ dan D−
+                                    </p>
+                                    <div className="text-sm font-mono">
+                                        <p>D+ = {distances[0].dPlus.toFixed(4)}</p>
+                                        <p>D− = {distances[0].dMinus.toFixed(4)}</p>
+                                    </div>
+                                </div>
+
+                                {/* Step 2 */}
+                                <div className="bg-white/60 p-3 rounded">
+                                    <p className="text-sm font-semibold text-indigo-800 mb-1">
+                                        Langkah 2: Hitung penjumlahan D+ + D−
+                                    </p>
+                                    <div className="text-sm font-mono">
+                                        <p>
+                                            D+ + D− = {distances[0].dPlus.toFixed(4)} + {distances[0].dMinus.toFixed(4)}
+                                        </p>
+                                        <p className="ml-12">
+                                            = <span className="text-indigo-700 font-semibold">
+                                                {(distances[0].dPlus + distances[0].dMinus).toFixed(4)}
+                                            </span>
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Step 3 */}
+                                <div className="bg-white/60 p-3 rounded">
+                                    <p className="text-sm font-semibold text-indigo-800 mb-1">
+                                        Langkah 3: Bagi D− dengan hasil penjumlahan
+                                    </p>
+                                    <div className="text-sm font-mono">
+                                        <p>
+                                            V = D− / (D+ + D−)
+                                        </p>
+                                        <p className="ml-4">
+                                            = {distances[0].dMinus.toFixed(4)} / {(distances[0].dPlus + distances[0].dMinus).toFixed(4)}
+                                        </p>
+                                        <p className="ml-4">
+                                            = <span className="text-indigo-700 font-bold text-base">
+                                                {distances[0].preferenceValue.toFixed(4)}
+                                            </span>
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Interpretation */}
+                                <div className="bg-blue-100 p-3 rounded border border-blue-300">
+                                    <p className="text-sm font-semibold text-blue-900 mb-1">
+                                        💡 Interpretasi:
+                                    </p>
+                                    <p className="text-sm text-gray-700">
+                                        Nilai V berkisar 0-1. Semakin <strong>mendekati 1</strong>, 
+                                        semakin dekat alternatif ini dengan solusi ideal positif (A+) 
+                                        dan semakin baik kualitasnya.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Show brief calculations for other alternatives */}
+                        <div className="bg-gray-50 p-4 rounded-lg mb-4 border border-gray-200">
                             <h4 className="font-semibold text-sm mb-2">
-                                Contoh Perhitungan:
+                                Perhitungan Semua Alternatif:
                             </h4>
                             <div className="space-y-1 text-sm font-mono">
                                 {alternatives.slice(0, 2).map((alt, i) => (
